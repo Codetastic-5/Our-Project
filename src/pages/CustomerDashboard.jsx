@@ -75,14 +75,14 @@ const CustomerDashboard = ({ onLogout }) => {
           {/* Today's Menu Header */}
           <div className="flex items-center gap-3 mb-6">
             <span className="text-orange-600 text-4xl">✨</span>
-            <h2 className="text-3xl font-bold">Today's Menu/stock?</h2>
+            <h2 className="text-3xl font-bold">Today's Menu!</h2>
           </div>
 
           {/* Menu Grid */}
           <div className="grid grid-cols-2 gap-6">
             {[1, 2, 3, 4, 5, 6].map((item) => (
               <div key={item} className="bg-white border-2 border-gray-300 rounded-2xl p-6 flex items-center gap-4 shadow-md hover:shadow-lg transition duration-200">
-                <div className="w-20 h-20 bg-yellow-400 rounded-xl flex-shrink-0"></div>
+                <div className="w-20 h-20 bg-yellow-400 rounded-xl shrink-0"></div>
                 <span className="text-xl font-bold">Item Name</span>
               </div>
             ))}
@@ -90,8 +90,8 @@ const CustomerDashboard = ({ onLogout }) => {
         </section>
       </main>
 
-      {/* Footer - Reusable Component */}
-      <Footer />
+      {/* Footer - Reusable Component (without role links) */}
+      <Footer showLinks={false} />
     </div>
   )
 }
