@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
+import { useMenu } from '../context/MenuContext'
 
 const CustomerDashboard = ({ onLogout }) => {
-  const [customerName] = useState('Customer name')
-  const [loyaltyPoints] = useState(120)
+  const { menuItems } = useMenu()
+  const [customerName] = useState('Bench')
+  const [loyaltyPoints] = useState(100)
 
   return (
     <div className="min-h-screen flex flex-col bg-orange-100">
@@ -75,15 +77,15 @@ const CustomerDashboard = ({ onLogout }) => {
           {/* Today's Menu Header */}
           <div className="flex items-center gap-3 mb-6">
             <span className="text-orange-600 text-4xl">✨</span>
-            <h2 className="text-3xl font-bold">Today's Menu!</h2>
+            <h2 className="text-3xl font-bold">Today's Menu/stock?</h2>
           </div>
 
           {/* Menu Grid */}
           <div className="grid grid-cols-2 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((item) => (
-              <div key={item} className="bg-white border-2 border-gray-300 rounded-2xl p-6 flex items-center gap-4 shadow-md hover:shadow-lg transition duration-200">
+            {menuItems.map((item) => (
+              <div key={item.id} className="bg-white border-2 border-gray-300 rounded-2xl p-6 flex items-center gap-4 shadow-md hover:shadow-lg transition duration-200">
                 <div className="w-20 h-20 bg-yellow-400 rounded-xl shrink-0"></div>
-                <span className="text-xl font-bold">Item Name</span>
+                <span className="text-xl font-bold">{item.name}</span>
               </div>
             ))}
           </div>
