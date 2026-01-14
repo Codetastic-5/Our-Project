@@ -9,25 +9,33 @@ const CustomerDashboard = ({ onLogout }) => {
   const [loyaltyPoints] = useState(100)
 
   return (
-    <div className="min-h-screen flex flex-col bg-orange-100">
+    <div className="min-h-screen flex flex-col bg-white-100">
       {/* Reusable Header */}
       <Header isLoggedIn={true} onLogout={onLogout} />
 
       {/* Main Content */}
       <main className="flex-1 flex">
         {/* Left Sidebar */}
-        <aside className="w-96 bg-orange-200 p-6 space-y-6">
+        <aside className="w-96 bg-orange-300 p-6 space-y-6">
           {/* Welcome Section */}
-          <div className="flex items-center gap-3 mb-6">
-            <span className="text-orange-600 text-4xl">🛍️</span>
+          <div className="flex items-center gap-1 mb-2">
+            <img 
+            src="/Welcome.png" 
+            alt="Welcome Logo" 
+            className="w-25 h-15"
+            />
             <h2 className="text-2xl font-bold">Welcome, {customerName}!</h2>
           </div>
 
           {/* Loyalty Points Card */}
           <div className="bg-white rounded-2xl p-6 shadow-lg">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="text-orange-600 text-3xl">⭐</span>
+              <div className="flex items-center">
+                <img 
+                src="/Loyalty.png" 
+                alt="Loyalty Logo" 
+                className="w-20 h-12"
+                />
                 <span className="text-xl font-bold">Your Loyalty Points:</span>
               </div>
               <div className="bg-orange-600 text-white px-6 py-3 rounded-full text-2xl font-bold">
@@ -38,8 +46,12 @@ const CustomerDashboard = ({ onLogout }) => {
 
           {/* Reservation Section */}
           <div className="bg-white rounded-2xl p-6 shadow-lg">
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-orange-600 text-3xl">📅</span>
+            <div className="flex items-center">
+              <img 
+              src="/Reservation.png" 
+              alt="Reservation Logo" 
+              className="w-20 h-12"
+              />
               <h3 className="text-2xl font-bold">Reservation</h3>
             </div>
 
@@ -75,9 +87,13 @@ const CustomerDashboard = ({ onLogout }) => {
         {/* Right Content Area */}
         <section className="flex-1 p-8">
           {/* Today's Menu Header */}
-          <div className="flex items-center gap-3 mb-6">
-            <span className="text-orange-600 text-4xl">✨</span>
-            <h2 className="text-3xl font-bold">Today's Menu/stock?</h2>
+          <div className="flex items-center gap-2 mb-2">
+            <img 
+              src="/Menu.png" 
+              alt="Menu Logo" 
+              className="w-32 h-auto"
+              />
+            <h2 className="text-3xl font-bold m-0">Today's Menu/stock?</h2>
           </div>
 
           {/* Menu Grid */}
