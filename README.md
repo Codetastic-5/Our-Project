@@ -46,7 +46,4 @@ This project allows customers to reserve items, earn loyalty points, and manage 
   - Firestore
 - **Lucide React** (icons)
 
----
-
-## 📁 Project Structure
 
