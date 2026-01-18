@@ -1,44 +1,76 @@
-import React, { useState } from 'react'
+import React, { useState } from "react";
+import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 
 const Login = ({ role, onSwitchMode, onSuccess }) => {
-  const [formData, setFormData] = useState({ identifier: '', password: '' })
-  const [errorMessage, setErrorMessage] = useState('')
+  const { login } = useAuth();
+  const toast = useToast();
+
+  const [formData, setFormData] = useState({ identifier: "", password: "" });
+  const [errorMessage, setErrorMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
-    setErrorMessage('')
-  }
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setErrorMessage("");
+  };
 
-  const handleSubmit = () => {
-    if (formData.identifier && formData.password) {
-      console.log('Login submitted for', role || 'customer', formData)
-      setErrorMessage('')
-      
-      // Simulate successful login
-      const userRole = role || 'customer'
-      alert(`Successfully logged in as ${userRole}!`)
-      setFormData({ identifier: '', password: '' })
-      
-      // Redirect based on role
-      if (onSuccess) onSuccess(userRole)
-    } else {
-      setErrorMessage('Please fill in all fields')
+  const handleSubmit = async () => {
+    const email = formData.identifier.trim();
+    const password = formData.password;
+
+    if (!email || !password) {
+      setErrorMessage("Please fill in all fields");
+      return;
     }
-  }
+
+    setLoading(true);
+    setErrorMessage("");
+
+    try {
+      await login(email, password);
+
+      // role is loaded from Firestore inside AuthContext (user.role)
+      toast.success("Logged in successfully!");
+      setFormData({ identifier: "", password: "" });
+
+      // keep your old callback (optional)
+      if (onSuccess) onSuccess(role || "customer");
+    } catch (err) {
+      // common Firebase errors → simple messages
+      const code = err?.code || "";
+      if (code.includes("auth/invalid-credential")) {
+        setErrorMessage("Wrong email or password.");
+      } else if (code.includes("auth/user-not-found")) {
+        setErrorMessage("No account found for this email.");
+      } else if (code.includes("auth/wrong-password")) {
+        setErrorMessage("Wrong email or password.");
+      } else if (code.includes("auth/too-many-requests")) {
+        setErrorMessage("Too many attempts. Try again later.");
+      } else {
+        setErrorMessage("Login failed. Please try again.");
+      }
+      toast.error("Login failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="absolute top-1/2 right-8 md:right-24 lg:right-32 transform -translate-y-1/2 bg-white border-2 border-black rounded-lg p-6 w-full max-w-md shadow-lg z-10 animate-slide-in-right">
       {!role && (
         <div className="flex justify-center gap-4 mb-4">
           <button
-            onClick={() => onSwitchMode && onSwitchMode('create', null)}
+            onClick={() => onSwitchMode && onSwitchMode("create", null)}
             className="px-4 py-2 font-semibold rounded-md bg-white text-orange-600 border-2 border-orange-600 hover:bg-orange-50 transition duration-200"
+            type="button"
           >
             Create Account
           </button>
           <button
             className="px-4 py-2 font-semibold rounded-md bg-orange-600 text-white"
+            type="button"
           >
             Log In
           </button>
@@ -46,7 +78,8 @@ const Login = ({ role, onSwitchMode, onSuccess }) => {
       )}
 
       <h2 className="text-3xl font-bold text-center mb-6">
-        LOG IN{role ? ` — ${role.charAt(0).toUpperCase() + role.slice(1)}` : ''}
+        LOG IN
+        {role ? ` — ${role.charAt(0).toUpperCase() + role.slice(1)}` : ""}
       </h2>
 
       {errorMessage && (
@@ -57,13 +90,13 @@ const Login = ({ role, onSwitchMode, onSuccess }) => {
 
       <div className="space-y-4">
         <input
-          type="text"
+          type="email"
           name="identifier"
-          placeholder="Email or Username"
+          placeholder="Email"
           value={formData.identifier}
           onChange={handleChange}
-          className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-orange-600"
-          required
+          className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+          autoComplete="email"
         />
 
         <input
@@ -72,25 +105,31 @@ const Login = ({ role, onSwitchMode, onSuccess }) => {
           placeholder="Password"
           value={formData.password}
           onChange={handleChange}
-          className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-orange-600"
-          required
+          className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+          autoComplete="current-password"
         />
 
         <button
           onClick={handleSubmit}
-          className="w-full bg-orange-600 text-white font-bold py-3 rounded-lg hover:bg-orange-700 transition duration-200"
+          disabled={loading}
+          className="w-full bg-orange-600 text-white font-bold py-3 rounded-lg hover:bg-orange-700 transition duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+          type="button"
         >
-          Log In
+          {loading ? "Logging in..." : "Log In"}
         </button>
       </div>
 
       <div className="mt-4 text-center">
-        <button className="text-sm text-orange-600 hover:underline">
+        <button
+          className="text-sm text-orange-600 hover:underline"
+          type="button"
+          onClick={() => toast.info("Forgot password: not added yet.")}
+        >
           Forgot password?
         </button>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Login
+export default Login;

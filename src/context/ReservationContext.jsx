@@ -25,8 +25,14 @@ export const ReservationProvider = ({ children }) => {
   }
 
   const cancelReservation = (id) => {
-    setReservations(prev => prev.filter(r => r.id !== id))
-  }
+    setReservations(prev =>
+      prev.map(r =>
+        r.id === id
+          ? { ...r, status: "cancelled" }
+          : r
+      )
+    );
+  };
 
   const completeReservation = (id) => {
     setReservations(prev => prev.map(r => 
@@ -39,8 +45,10 @@ export const ReservationProvider = ({ children }) => {
   }
 
   const getCustomerReservations = (customerName) => {
-    return reservations.filter(r => r.customerName === customerName)
-  }
+    return reservations.filter(
+      r => r.customerName === customerName && r.status !== "cancelled"
+    );
+  };
 
   return (
     <ReservationContext.Provider value={{ 

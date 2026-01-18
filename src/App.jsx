@@ -1,106 +1,91 @@
-import { useState } from 'react'
-import Header from './components/Header'
-import Hero from './components/Hero'
-import CreateAccount from './components/CreateAccount'
-import Login from './components/Login'
-import Footer from './components/Footer'
-import CustomerDashboard from './pages/CustomerDashboard'
-import CashierDashboard from './pages/CashierDashboard'
-import { MenuProvider } from './context/MenuContext'
-import { ReservationProvider } from './context/ReservationContext'  // Add this
-import './App.css'
+import { useState } from "react";
+import Header from "./components/Header";
+import Hero from "./components/Hero";
+import CreateAccount from "./components/CreateAccount";
+import Footer from "./components/Footer";
+import CustomerDashboard from "./pages/CustomerDashboard";
+import CashierDashboard from "./pages/CashierDashboard";
+import { MenuProvider } from "./context/MenuContext";
+import { ReservationProvider } from "./context/ReservationContext";
+import { useAuth } from "./context/AuthContext";
+import "./App.css";
+
+
+// IMPORTANT:
+// Use the Firebase Login page (the one we made earlier).
+// If your Firebase login file is in src/pages/Login.jsx, use this import:
+import Login from "./components/Login";
 
 function App() {
-  const [mode, setMode] = useState('create')
-  const [selectedRole, setSelectedRole] = useState(null)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [userRole, setUserRole] = useState(null)
+  const { user, logout } = useAuth();
+
+  // this controls your old homepage switching (create vs login)
+  const [mode, setMode] = useState("create");
+  const [selectedRole, setSelectedRole] = useState(null);
 
   const handleSelectRole = (role) => {
-    setSelectedRole(role)
-    setMode('login')
-  }
+    setSelectedRole(role);
+    setMode("login");
+  };
 
   const handleGoHome = () => {
-    setMode('create')
-    setSelectedRole(null)
-    setIsLoggedIn(false)
-    setUserRole(null)
-  }
+    setMode("create");
+    setSelectedRole(null);
+  };
 
   const handleSwitchMode = (newMode, role) => {
-    setMode(newMode)
-    if (role !== undefined) {
-      setSelectedRole(role)
-    }
+    setMode(newMode);
+    if (role !== undefined) setSelectedRole(role);
+  };
+
+  // LOGGED IN (Firebase)
+  if (user) {
+    return (
+      <MenuProvider>
+        <ReservationProvider>
+          {user.role === "cashier" ? (
+            <CashierDashboard onLogout={logout} />
+          ) : (
+            <CustomerDashboard onLogout={logout} />
+          )}
+        </ReservationProvider>
+      </MenuProvider>
+    );
   }
 
-  const handleLoginSuccess = (role) => {
-    setIsLoggedIn(true)
-    setUserRole(role)
-  }
-
-  const handleCreateAccountSuccess = () => {
-    setIsLoggedIn(true)
-    setUserRole('customer')
-  }
-
+  // NOT LOGGED IN (Old homepage)
   return (
     <MenuProvider>
-      <ReservationProvider>  {/* Add this wrapper */}
-        {renderContent()}
+      <ReservationProvider>
+        <div className="min-h-screen flex flex-col">
+          <Header isLoggedIn={false} />
+
+          <main className="relative flex-1 pt-20">
+            <Hero />
+
+            {mode === "create" ? (
+              <CreateAccount
+                onSwitchMode={handleSwitchMode}
+                // For now, after create account we just go to login screen.
+                // Later we can connect CreateAccount to Firebase createUserWithEmailAndPassword.
+                onSuccess={() => setMode("login")}
+              />
+            ) : (
+              <Login
+                // Your selectedRole can be used just for UI text.
+                role={selectedRole}
+                onSwitchMode={handleSwitchMode}
+                // If your Login page doesn’t support onBack/onSuccess, remove these props.
+                onBack={handleGoHome}
+              />
+            )}
+          </main>
+
+          <Footer onSelectRole={handleSelectRole} onGoHome={handleGoHome} />
+        </div>
       </ReservationProvider>
     </MenuProvider>
-  )
-
-  function renderContent() {
-    if (isLoggedIn && userRole === 'customer') {
-      return <CustomerDashboard onLogout={handleGoHome} />
-    }
-
-    if (isLoggedIn && userRole === 'cashier') {
-      return <CashierDashboard onLogout={handleGoHome} />
-    }
-
-    if (isLoggedIn && userRole === 'admin') {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-orange-100">
-          <div className="text-center">
-            <h1 className="text-4xl font-bold mb-4">Admin Dashboard</h1>
-            <p className="text-xl mb-4">Coming soon...</p>
-            <button 
-              onClick={handleGoHome}
-              className="bg-orange-600 text-white px-6 py-3 rounded-lg hover:bg-orange-700"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      )
-    }
-
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Header isLoggedIn={false} />
-        <main className="relative flex-1 pt-20">
-          <Hero />
-          {mode === 'create' ? (
-            <CreateAccount 
-              onSwitchMode={handleSwitchMode} 
-              onSuccess={handleCreateAccountSuccess}
-            />
-          ) : (
-            <Login 
-              role={selectedRole} 
-              onSwitchMode={handleSwitchMode}
-              onSuccess={handleLoginSuccess}
-            />
-          )}
-        </main>
-        <Footer onSelectRole={handleSelectRole} onGoHome={handleGoHome} />
-      </div>
-    )
-  }
+  );
 }
 
-export default App
+export default App;
