@@ -63,7 +63,7 @@ function App() {
         <div className="min-h-screen flex flex-col">
           <Header isLoggedIn={false} />
 
-          <main className="relative flex-1 pt-20">
+          <main className="relative flex-1 flex bg-gradient-to-r from-orange-500 to-orange-300">
             <Hero />
 
             {mode === "create" ? (

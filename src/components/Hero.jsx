@@ -3,8 +3,7 @@ import React from 'react'
 const Hero = () => {
   return (
     <section
-      className="bg-gradient-to-r from-orange-500 to-orange-300 px-6 py-8 flex items-center justify-between"
-      style={{ minHeight: 'calc(100vh - 112px)' }}
+      className="px-6 pt-24 pb-8 flex items-center justify-between flex-1"
     >
       <div className="max-w-2xl animate-slide-in-left">
         <h2 className="text-black-800 text-3xl font-bold mb-2">WELCOME TO</h2>
