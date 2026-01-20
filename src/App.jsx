@@ -5,6 +5,7 @@ import CreateAccount from "./components/CreateAccount";
 import Footer from "./components/Footer";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import CashierDashboard from "./pages/CashierDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 import { MenuProvider } from "./context/MenuContext";
 import { ReservationProvider } from "./context/ReservationContext";
 import { useAuth } from "./context/AuthContext";
@@ -43,7 +44,9 @@ function App() {
     return (
       <MenuProvider>
         <ReservationProvider>
-          {user.role === "cashier" ? (
+          {user.role === "admin" ? (
+            <AdminDashboard onLogout={logout} />
+          ) : user.role === "cashier" ? (
             <CashierDashboard onLogout={logout} />
           ) : (
             <CustomerDashboard onLogout={logout} />
