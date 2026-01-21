@@ -1,10 +1,14 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { auth, db } from "../firebase";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
+  updateEmail,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
 } from "firebase/auth";
 
 const AuthContext = createContext(null);
@@ -71,8 +75,48 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => signOut(auth);
 
+  // Re-authenticate user before sensitive operations
+  const reauthenticate = async (currentPassword) => {
+    const credential = EmailAuthProvider.credential(
+      auth.currentUser.email,
+      currentPassword
+    );
+    await reauthenticateWithCredential(auth.currentUser, credential);
+  };
+
+  // Update user's email
+  const updateUserEmail = async (newEmail, currentPassword) => {
+    await reauthenticate(currentPassword);
+    await updateEmail(auth.currentUser, newEmail);
+  };
+
+  // Update user's password
+  const updateUserPassword = async (newPassword, currentPassword) => {
+    await reauthenticate(currentPassword);
+    await updatePassword(auth.currentUser, newPassword);
+  };
+
+  // Update user's name in Firestore
+  const updateUserName = async (newName) => {
+    if (!auth.currentUser) throw new Error("Not logged in");
+    console.log("Updating name to:", newName, "for user:", auth.currentUser.uid);
+    const userRef = doc(db, "users", auth.currentUser.uid);
+    await updateDoc(userRef, { name: newName });
+    console.log("Name updated successfully in Firestore");
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        logout,
+        updateUserEmail,
+        updateUserPassword,
+        updateUserName,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
