@@ -4,18 +4,109 @@ import Footer from "../components/Footer";
 import { useMenu } from "../context/MenuContext";
 import { useReservations } from "../context/ReservationContext";
 import { useToast } from "../context/ToastContext";
-import { Calendar, Clock, Package, X } from "lucide-react";
+import { Calendar, Clock, Package, X, Settings } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase";
 import { doc, updateDoc, increment } from "firebase/firestore";
 
 const CustomerDashboard = ({ onLogout }) => {
   const toast = useToast();
-  const { user: authUser, loading } = useAuth();
+  const { user: authUser, loading, updateUserEmail, updateUserPassword, updateUserName } = useAuth();
   console.log("AUTH USER:", authUser);
   const { menuItems } = useMenu();
   const { addReservation, cancelReservation, getCustomerReservations } =
     useReservations();
+
+  // Settings modal state
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsForm, setSettingsForm] = useState({
+    newName: "",
+    newEmail: "",
+    newPassword: "",
+    confirmPassword: "",
+    currentPassword: "",
+  });
+  const [settingsLoading, setSettingsLoading] = useState(false);
+
+  // Settings handlers
+  const handleSettingsChange = (e) => {
+    const { name, value } = e.target;
+    setSettingsForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleUpdateName = async () => {
+    if (!settingsForm.newName.trim()) {
+      toast.error("Please enter a new username.");
+      return;
+    }
+    setSettingsLoading(true);
+    try {
+      await updateUserName(settingsForm.newName.trim());
+      toast.success("Username updated successfully!");
+      setSettingsForm((prev) => ({ ...prev, newName: "" }));
+    } catch (err) {
+      console.error("Update name error:", err);
+      toast.error("Failed to update username.");
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
+  const handleUpdateEmail = async () => {
+    if (!settingsForm.newEmail.trim() || !settingsForm.currentPassword) {
+      toast.error("Please enter new email and current password.");
+      return;
+    }
+    setSettingsLoading(true);
+    try {
+      await updateUserEmail(settingsForm.newEmail.trim(), settingsForm.currentPassword);
+      toast.success("Email updated successfully!");
+      setSettingsForm((prev) => ({ ...prev, newEmail: "", currentPassword: "" }));
+    } catch (err) {
+      const code = err?.code || "";
+      if (code.includes("auth/wrong-password") || code.includes("auth/invalid-credential")) {
+        toast.error("Current password is incorrect.");
+      } else if (code.includes("auth/email-already-in-use")) {
+        toast.error("Email is already in use.");
+      } else if (code.includes("auth/invalid-email")) {
+        toast.error("Invalid email format.");
+      } else {
+        toast.error("Failed to update email.");
+      }
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (!settingsForm.newPassword || !settingsForm.confirmPassword || !settingsForm.currentPassword) {
+      toast.error("Please fill in all password fields.");
+      return;
+    }
+    if (settingsForm.newPassword !== settingsForm.confirmPassword) {
+      toast.error("New passwords do not match.");
+      return;
+    }
+    if (settingsForm.newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters.");
+      return;
+    }
+    setSettingsLoading(true);
+    try {
+      await updateUserPassword(settingsForm.newPassword, settingsForm.currentPassword);
+      toast.success("Password updated successfully!");
+      setSettingsForm((prev) => ({ ...prev, newPassword: "", confirmPassword: "", currentPassword: "" }));
+    } catch (err) {
+      const code = err?.code || "";
+      if (code.includes("auth/wrong-password") || code.includes("auth/invalid-credential")) {
+        toast.error("Current password is incorrect.");
+      } else {
+        toast.error("Failed to update password.");
+      }
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -41,8 +132,10 @@ const CustomerDashboard = ({ onLogout }) => {
   const generateTimeSlots = () => {
     const slots = [];
     for (let hour = 9; hour <= 20; hour++) {
-      slots.push(`${hour}:00`);
-      if (hour < 20) slots.push(`${hour}:30`);
+      const period = hour >= 12 ? "PM" : "AM";
+      const displayHour = hour > 12 ? hour - 12 : hour;
+      slots.push(`${displayHour}:00 ${period}`);
+      if (hour < 20) slots.push(`${displayHour}:30 ${period}`);
     }
     return slots;
   };
@@ -138,6 +231,134 @@ const handleCancelReservation = async (res) => {
     <div className="min-h-screen flex flex-col bg-gray-50 pt-20">
       <Header isLoggedIn={true} onLogout={onLogout} />
 
+      {/* Settings Button */}
+      <button
+        onClick={() => setShowSettings(true)}
+        className="fixed bottom-20 right-6 bg-orange-600 hover:bg-orange-700 text-white p-4 rounded-full shadow-lg z-40 transition"
+        type="button"
+        title="Settings"
+      >
+        <Settings size={24} />
+      </button>
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="bg-orange-600 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
+              <h2 className="text-xl font-bold">Account Settings</h2>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="hover:bg-orange-700 p-1 rounded transition"
+                type="button"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Current Info */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-500">Current Account</p>
+                <p className="font-semibold">{authUser?.name || "N/A"}</p>
+                <p className="text-gray-600">{authUser?.email || "N/A"}</p>
+              </div>
+
+              {/* Update Username */}
+              <div className="space-y-3">
+                <h3 className="font-bold text-gray-700">Change Username</h3>
+                <input
+                  type="text"
+                  name="newName"
+                  placeholder="New username"
+                  value={settingsForm.newName}
+                  onChange={handleSettingsChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:outline-none transition"
+                />
+                <button
+                  onClick={handleUpdateName}
+                  disabled={settingsLoading}
+                  className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 rounded-lg transition disabled:opacity-60"
+                  type="button"
+                >
+                  Update Username
+                </button>
+              </div>
+
+              <hr className="border-gray-200" />
+
+              {/* Update Email */}
+              <div className="space-y-3">
+                <h3 className="font-bold text-gray-700">Change Email</h3>
+                <input
+                  type="email"
+                  name="newEmail"
+                  placeholder="New email"
+                  value={settingsForm.newEmail}
+                  onChange={handleSettingsChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:outline-none transition"
+                />
+                <input
+                  type="password"
+                  name="currentPassword"
+                  placeholder="Current password (required)"
+                  value={settingsForm.currentPassword}
+                  onChange={handleSettingsChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:outline-none transition"
+                />
+                <button
+                  onClick={handleUpdateEmail}
+                  disabled={settingsLoading}
+                  className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 rounded-lg transition disabled:opacity-60"
+                  type="button"
+                >
+                  Update Email
+                </button>
+              </div>
+
+              <hr className="border-gray-200" />
+
+              {/* Update Password */}
+              <div className="space-y-3">
+                <h3 className="font-bold text-gray-700">Change Password</h3>
+                <input
+                  type="password"
+                  name="currentPassword"
+                  placeholder="Current password"
+                  value={settingsForm.currentPassword}
+                  onChange={handleSettingsChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:outline-none transition"
+                />
+                <input
+                  type="password"
+                  name="newPassword"
+                  placeholder="New password (min 6 characters)"
+                  value={settingsForm.newPassword}
+                  onChange={handleSettingsChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:outline-none transition"
+                />
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  placeholder="Confirm new password"
+                  value={settingsForm.confirmPassword}
+                  onChange={handleSettingsChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:outline-none transition"
+                />
+                <button
+                  onClick={handleUpdatePassword}
+                  disabled={settingsLoading}
+                  className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 rounded-lg transition disabled:opacity-60"
+                  type="button"
+                >
+                  Update Password
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main className="flex-1 flex flex-col lg:flex-row">
         <aside className="w-full lg:w-96 bg-orange-300 p-4 sm:p-6 space-y-6">
           <div className="flex items-center gap-3 mb-2">
@@ -188,7 +409,7 @@ const handleCancelReservation = async (res) => {
                 <option value="">Select Item</option>
                 {menuItems.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.name}
+                    {item.name} - ₱{item.price || 0}
                   </option>
                 ))}
               </select>
@@ -342,11 +563,25 @@ const handleCancelReservation = async (res) => {
             {menuItems.map((item) => (
               <div
                 key={item.id}
-                className="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 flex items-center gap-4 shadow-md hover:shadow-lg hover:border-orange-400 transition cursor-pointer"
-                onClick={() => handleReservationChange("item", item.id.toString())}
+                className={`bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 flex items-center gap-4 shadow-md hover:shadow-lg transition ${
+                  item.stock > 0 
+                    ? 'hover:border-orange-400 cursor-pointer' 
+                    : 'opacity-60 cursor-not-allowed'
+                }`}
+                onClick={() => {
+                  if (item.stock > 0) {
+                    handleReservationChange("item", item.id.toString());
+                  }
+                }}
               >
                 <div className="w-16 h-16 sm:w-20 sm:h-20 bg-yellow-400 rounded-xl shrink-0"></div>
-                <span className="text-lg sm:text-xl font-bold">{item.name}</span>
+                <div className="flex flex-col">
+                  <span className="text-lg sm:text-xl font-bold">{item.name}</span>
+                  <span className="text-base font-bold text-orange-600">₱{item.price || 0}</span>
+                  <span className={`text-sm font-medium ${item.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {item.stock > 0 ? 'On Stock' : 'Out of Stock'}
+                  </span>
+                </div>
               </div>
             ))}
           </div>

@@ -78,8 +78,7 @@ const Login = ({ role, onSwitchMode, onSuccess }) => {
       )}
 
       <h2 className="text-3xl font-bold text-center mb-6">
-        LOG IN
-        {role ? ` — ${role.charAt(0).toUpperCase() + role.slice(1)}` : ""}
+        {role ? `${role.charAt(0).toUpperCase() + role.slice(1)} ` : ""}LOG IN
       </h2>
 
       {errorMessage && (
