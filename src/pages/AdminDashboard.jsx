@@ -1,11 +1,16 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useMenu } from "../context/MenuContext";
 import { useToast } from "../context/ToastContext";
+import { useAuth } from "../context/AuthContext";
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "../firebase";
 
 const AdminDashboard = ({ onLogout }) => {
   const toast = useToast();
+  const { user: authUser } = useAuth();
+  console.log("AUTH ROLE:", authUser?.role, "UID:", authUser?.uid);
   const { menuItems, addMenuItem, updateStock, deleteMenuItem, updatePrice } = useMenu();
 
   const [newItemName, setNewItemName] = useState("");
@@ -13,12 +18,60 @@ const AdminDashboard = ({ onLogout }) => {
   const [newItemPrice, setNewItemPrice] = useState("");
   const [searchUsername, setSearchUsername] = useState("");
 
-  // Mock customer data - replace with real data from your backend
-  const [customers] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(true);
 
-  const filteredCustomers = customers.filter((customer) =>
-    customer.username.toLowerCase().includes(searchUsername.toLowerCase())
-  );
+  const role = String(authUser?.role || "").toLowerCase();
+  const isStaff = role === "cashier" || role === "admin";
+
+  useEffect(() => {
+    if (!authUser?.uid) {
+      setCustomers([]);
+      setLoadingCustomers(false);
+      return;
+    }
+
+    if (!isStaff) {
+      setCustomers([]);
+      setLoadingCustomers(false);
+      return;
+    }
+
+    setLoadingCustomers(true);
+    const unsub = onSnapshot(
+      collection(db, "users"),
+      (snap) => {
+        console.log("CUSTOMERS SNAP SIZE:", snap.size);
+        const list = snap.docs.map((d) => {
+          const data = d.data() || {};
+          return {
+            id: d.id,
+            name: data.name || "",
+            email: data.email || "",
+            points: typeof data.points === "number" ? data.points : 0,
+            role: data.role || "customer",
+          };
+        });
+        setCustomers(list);
+        setLoadingCustomers(false);
+      },
+      (err) => {
+        console.error("users snapshot error:", err);
+        setCustomers([]);
+        setLoadingCustomers(false);
+      }
+    );
+
+    return () => unsub();
+  }, [authUser?.uid, isStaff]);
+
+  const filteredCustomers = useMemo(() => {
+    const term = searchUsername.trim().toLowerCase();
+    if (!term) return customers;
+    return customers.filter((customer) =>
+      String(customer?.name || "").toLowerCase().includes(term)
+    );
+  }, [customers, searchUsername]);
 
   const handleAddMenuItem = () => {
     if (!newItemName.trim()) {
@@ -201,40 +254,53 @@ const AdminDashboard = ({ onLogout }) => {
 
               {/* Customer Count */}
               <div className="text-sm text-gray-600 font-medium mb-6">
-                {searchUsername.trim() === ""
-                  ? customers.length
-                  : filteredCustomers.length}{" "}
-                Customer{customers.length !== 1 ? "s" : ""}
+                {searchUsername.trim() === "" ? customers.length : filteredCustomers.length} User
+                {((searchUsername.trim() === "" ? customers.length : filteredCustomers.length) || 0) !== 1 ? "s" : ""}
               </div>
 
               {/* Customer List */}
-              <div className="space-y-0 max-h-96 overflow-y-auto">
-                {filteredCustomers.length === 0 && searchUsername.trim() !== "" ? (
-                  <p className="text-gray-400 text-center py-16">
-                    Customer not found
-                  </p>
+              <div className="max-h-96 overflow-auto border border-gray-200 rounded-lg">
+                {!isStaff ? (
+                  <div className="text-gray-400 text-center py-16">
+                    Not authorized to view users.
+                  </div>
+                ) : loadingCustomers ? (
+                  <div className="text-gray-500 text-center py-16">Loading users...</div>
+                ) : filteredCustomers.length === 0 && searchUsername.trim() !== "" ? (
+                  <p className="text-gray-400 text-center py-16">User not found</p>
                 ) : filteredCustomers.length === 0 ? (
-                  <p className="text-gray-400 text-center py-16">
-                    Search for a customer
-                  </p>
+                  <p className="text-gray-400 text-center py-16">No users to display</p>
                 ) : (
-                  filteredCustomers.map((customer, index) => (
-                    <div
-                      key={customer.id}
-                      className={`flex items-center justify-between px-4 py-4 ${
-                        index !== filteredCustomers.length - 1
-                          ? "border-b border-gray-200"
-                          : ""
-                      }`}
-                    >
-                      <span className="font-medium text-gray-800 text-base">
-                        {customer.username}
-                      </span>
-                      <span className="text-gray-700 font-semibold text-base">
-                        Points: {customer.points}
-                      </span>
-                    </div>
-                  ))
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50 text-gray-700 sticky top-0">
+                      <tr>
+                        <th className="text-left font-bold px-4 py-3">Name</th>
+                        <th className="text-left font-bold px-4 py-3">Email</th>
+                        <th className="text-left font-bold px-4 py-3">Points</th>
+                        <th className="text-left font-bold px-4 py-3">Role</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      {filteredCustomers.map((customer) => (
+                        <tr key={customer.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-medium text-gray-800">
+                            {customer.name || "(no name)"}
+                          </td>
+                          <td className="px-4 py-3 text-gray-700 break-all">
+                            {customer.email || ""}
+                          </td>
+                          <td className="px-4 py-3 text-gray-700 font-semibold">
+                            {customer.points ?? 0}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700">
+                              {String(customer.role || "customer").toUpperCase()}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
               </div>
             </div>

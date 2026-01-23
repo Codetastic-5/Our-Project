@@ -9,26 +9,218 @@ import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase";
 import { doc, updateDoc, increment } from "firebase/firestore";
 
+const ReservationCard = ({ res, onCancel }) => {
+  return (
+    <div className="bg-orange-50 p-3 rounded-xl border border-orange-200">
+      <div className="flex justify-between items-start mb-2 gap-3">
+        <div className="font-bold text-base sm:text-lg">{res.itemName}</div>
+
+        {onCancel && res.status === "pending" ? (
+          <button
+            onClick={() => onCancel(res)}
+            className="text-red-600 hover:text-red-800 font-bold"
+            type="button"
+          >
+            ✕
+          </button>
+        ) : null}
+      </div>
+
+      <div className="text-sm text-gray-700 space-y-1">
+        <div className="flex items-center gap-2">
+          <Calendar size={16} />
+          <span>
+            {new Date(res.date).toLocaleDateString("en-US", {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+            })}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Clock size={16} />
+          <span>{res.time}</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Package size={16} />
+          <span>Quantity: {res.quantity}</span>
+        </div>
+
+        <div className="mt-2">
+          <span
+            className={`px-2 py-1 rounded-full text-xs font-bold ${
+              res.status === "pending"
+                ? "bg-yellow-200 text-yellow-800"
+                : res.status === "completed"
+                ? "bg-green-200 text-green-800"
+                : "bg-gray-200 text-gray-800"
+            }`}
+          >
+            {String(res.status || "").toUpperCase()}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const CustomerDashboard = ({ onLogout }) => {
   const toast = useToast();
-  const { user: authUser, loading, updateUserEmail, updateUserPassword, updateUserName } = useAuth();
+  const { user: authUser, loading, updateUserPassword, updateUserName } = useAuth();
   console.log("AUTH USER:", authUser);
   const { menuItems } = useMenu();
-  const { addReservation, cancelReservation, getCustomerReservations } =
-    useReservations();
+  const {
+    reservations: myReservations,
+    loadingReservations,
+    addReservation: addReservations,
+    cancelReservation: cancelReservations,
+  } = useReservations();
 
-  // Settings modal state
+  // State
   const [showSettings, setShowSettings] = useState(false);
+  const [filterDate, setFilterDate] = useState("");
+  const [sortOrder, setSortOrder] = useState("newest");
+  const [quickFilter, setQuickFilter] = useState("all");
   const [settingsForm, setSettingsForm] = useState({
     newName: "",
-    newEmail: "",
     newPassword: "",
     confirmPassword: "",
-    currentPassword: "",
+    currentPasswordForPassword: "",
   });
   const [settingsLoading, setSettingsLoading] = useState(false);
 
-  // Settings handlers
+  const [reservation, setReservation] = useState({
+    item: "",
+    date: "",
+    quantity: 1,
+    time: "",
+  });
+
+  const pendingReservations = myReservations.filter(
+    (r) => r.status === "pending"
+  );
+
+  const completedReservations = myReservations.filter(
+    (r) => r.status === "completed"
+  );
+
+  const cancelledReservations = myReservations.filter(
+    (r) => r.status === "cancelled"
+  );
+
+  const toLocalDateString = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  };
+
+  const getReservationDateString = (reservation) => {
+    if (!reservation) return "";
+    if (typeof reservation.date === "string") return reservation.date;
+    if (typeof reservation.date?.toDate === "function") {
+      const d = reservation.date.toDate();
+      if (d instanceof Date && !Number.isNaN(d.getTime())) {
+        // Note: toISOString is UTC-based; local quick filters use local dates,
+        // but manual date picker values are YYYY-MM-DD and compare directly.
+        return d.toISOString().slice(0, 10);
+      }
+    }
+    return "";
+  };
+
+  const filterByQuickFilter = (list) => {
+    if (quickFilter === "all") return list;
+
+    const today = new Date();
+    const startStr = toLocalDateString(today);
+    const end = new Date(today);
+    end.setDate(end.getDate() + 6);
+    const endStr = toLocalDateString(end);
+
+    return list.filter((r) => {
+      const dateStr = getReservationDateString(r);
+      if (!dateStr) return false;
+
+      if (quickFilter === "today") {
+        return dateStr === startStr;
+      }
+
+      // quickFilter === "week": [today, today+6]
+      return dateStr >= startStr && dateStr <= endStr;
+    });
+  };
+
+  const filterByManualDate = (list) => {
+    if (quickFilter !== "all") return list;
+    if (!filterDate) return list;
+
+    return list.filter((r) => {
+      const reservationDate = getReservationDateString(r);
+      return reservationDate === filterDate;
+    });
+  };
+
+  const getCreatedAtMs = (createdAt) => {
+    if (!createdAt) return null;
+
+    if (typeof createdAt.toMillis === "function") {
+      const ms = createdAt.toMillis();
+      return Number.isFinite(ms) ? ms : null;
+    }
+
+    if (typeof createdAt.toDate === "function") {
+      const d = createdAt.toDate();
+      const ms = d?.getTime?.();
+      return Number.isFinite(ms) ? ms : null;
+    }
+
+    if (typeof createdAt === "number") {
+      return Number.isFinite(createdAt) ? createdAt : null;
+    }
+
+    if (typeof createdAt === "string") {
+      const ms = Date.parse(createdAt);
+      return Number.isNaN(ms) ? null : ms;
+    }
+
+    if (typeof createdAt?.seconds === "number") {
+      const seconds = createdAt.seconds;
+      const nanoseconds = typeof createdAt?.nanoseconds === "number" ? createdAt.nanoseconds : 0;
+      return seconds * 1000 + Math.floor(nanoseconds / 1e6);
+    }
+
+    return null;
+  };
+
+  const sortReservations = (list) => {
+    const direction = sortOrder === "oldest" ? 1 : -1;
+    return [...list].sort((a, b) => {
+      const aMs = getCreatedAtMs(a?.createdAt);
+      const bMs = getCreatedAtMs(b?.createdAt);
+
+      // Missing timestamps should not crash and should consistently sort last.
+      if (aMs == null && bMs == null) return 0;
+      if (aMs == null) return 1;
+      if (bMs == null) return -1;
+
+      return (aMs - bMs) * direction;
+    });
+  };
+
+  const pendingFiltered = filterByManualDate(filterByQuickFilter(pendingReservations));
+  const completedFiltered = filterByManualDate(filterByQuickFilter(completedReservations));
+  const cancelledFiltered = filterByManualDate(filterByQuickFilter(cancelledReservations));
+
+  const pendingSorted = sortReservations(pendingFiltered);
+  const completedSorted = sortReservations(completedFiltered);
+  const cancelledSorted = sortReservations(cancelledFiltered);
+
+console.log("MY RESERVATIONS:", myReservations);
+
+  // Handlers
   const handleSettingsChange = (e) => {
     const { name, value } = e.target;
     setSettingsForm((prev) => ({ ...prev, [name]: value }));
@@ -44,6 +236,7 @@ const CustomerDashboard = ({ onLogout }) => {
       await updateUserName(settingsForm.newName.trim());
       toast.success("Username updated successfully!");
       setSettingsForm((prev) => ({ ...prev, newName: "" }));
+      setShowSettings(false);
     } catch (err) {
       console.error("Update name error:", err);
       toast.error("Failed to update username.");
@@ -52,34 +245,8 @@ const CustomerDashboard = ({ onLogout }) => {
     }
   };
 
-  const handleUpdateEmail = async () => {
-    if (!settingsForm.newEmail.trim() || !settingsForm.currentPassword) {
-      toast.error("Please enter new email and current password.");
-      return;
-    }
-    setSettingsLoading(true);
-    try {
-      await updateUserEmail(settingsForm.newEmail.trim(), settingsForm.currentPassword);
-      toast.success("Email updated successfully!");
-      setSettingsForm((prev) => ({ ...prev, newEmail: "", currentPassword: "" }));
-    } catch (err) {
-      const code = err?.code || "";
-      if (code.includes("auth/wrong-password") || code.includes("auth/invalid-credential")) {
-        toast.error("Current password is incorrect.");
-      } else if (code.includes("auth/email-already-in-use")) {
-        toast.error("Email is already in use.");
-      } else if (code.includes("auth/invalid-email")) {
-        toast.error("Invalid email format.");
-      } else {
-        toast.error("Failed to update email.");
-      }
-    } finally {
-      setSettingsLoading(false);
-    }
-  };
-
   const handleUpdatePassword = async () => {
-    if (!settingsForm.newPassword || !settingsForm.confirmPassword || !settingsForm.currentPassword) {
+    if (!settingsForm.newPassword || !settingsForm.confirmPassword || !settingsForm.currentPasswordForPassword) {
       toast.error("Please fill in all password fields.");
       return;
     }
@@ -93,9 +260,10 @@ const CustomerDashboard = ({ onLogout }) => {
     }
     setSettingsLoading(true);
     try {
-      await updateUserPassword(settingsForm.newPassword, settingsForm.currentPassword);
+      await updateUserPassword(settingsForm.newPassword, settingsForm.currentPasswordForPassword);
       toast.success("Password updated successfully!");
-      setSettingsForm((prev) => ({ ...prev, newPassword: "", confirmPassword: "", currentPassword: "" }));
+      setSettingsForm((prev) => ({ ...prev, newPassword: "", confirmPassword: "", currentPasswordForPassword: "" }));
+      setShowSettings(false);
     } catch (err) {
       const code = err?.code || "";
       if (code.includes("auth/wrong-password") || code.includes("auth/invalid-credential")) {
@@ -107,27 +275,6 @@ const CustomerDashboard = ({ onLogout }) => {
       setSettingsLoading(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        Loading...
-      </div>
-    );
-  }
-
-  const loyaltyPoints = authUser?.points ?? 0;
-
-  const customerName = authUser?.name || "Customer";
-
-  const [reservation, setReservation] = useState({
-    item: "",
-    date: "",
-    quantity: 1,
-    time: "",
-  });
-
-  const myReservations = getCustomerReservations(customerName);
 
   const generateTimeSlots = () => {
     const slots = [];
@@ -157,68 +304,88 @@ const CustomerDashboard = ({ onLogout }) => {
     return dates;
   };
 
-const handleReservationChange = (field, value) => {setReservation((prev) => ({...prev,[field]: value,}));};
+  const handleReservationChange = (field, value) => {
+    setReservation((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
 
-const handleReserve = async () => {
-  if (!reservation.item || !reservation.date || !reservation.time) {
-    toast.error("Please fill in all fields.");
-    return;
-  }
+  const handleReserve = async () => {
+    if (!reservation.item || !reservation.date || !reservation.time) {
+      toast.error("Please fill in all fields.");
+      return;
+    }
 
-  const itemName = menuItems.find(
-    (item) => item.id === parseInt(reservation.item)
-  )?.name;
+    const customerName = authUser?.name || "Customer";
+    const itemName = menuItems.find(
+      (item) => item.id === parseInt(reservation.item)
+    )?.name;
 
-  // add reservation locally
-  addReservation({
-    ...reservation,
-    itemName,
-    customerName,
-    pointsAwarded: true,
-  });
-
-  // ✅ add +10 points in Firestore (live UI updates because of onSnapshot)
-  try {
-    await updateDoc(doc(db, "users", authUser.uid), {
-      points: increment(10),
+    // add reservation locally
+    await addReservations({
+      customerUid: authUser.uid,
+      customerName, // optional but nice for cashier UI
+      itemId: parseInt(reservation.item),
+      itemName,
+      date: reservation.date,
+      time: reservation.time,
+      quantity: reservation.quantity,
+      pointsAwarded: true,
     });
-    toast.success("Reservation confirmed! +10 loyalty points");
-  } catch (e) {
-    toast.error("Failed to update points. Please try again.");
-    console.error(e);
-  }
 
-  setReservation({
-    item: "",
-    date: "",
-    quantity: 1,
-    time: "",
-  });
-};
-
-const handleCancelReservation = async (res) => {
-  // only allow cancel if still pending
-  if (res.status !== "pending") {
-    toast.info("This reservation can’t be cancelled.");
-    return;
-  }
-
-  cancelReservation(res.id);
-  toast.info("Reservation cancelled.");
-
-  if (res.pointsAwarded) {
+    // ✅ add +10 points in Firestore (live UI updates because of onSnapshot)
     try {
       await updateDoc(doc(db, "users", authUser.uid), {
-        points: increment(-10),
+        points: increment(10),
       });
-      toast.info("-10 loyalty points");
+      toast.success("Reservation confirmed! +10 loyalty points");
     } catch (e) {
-      toast.error("Failed to update points.");
+      toast.error("Failed to update points. Please try again.");
       console.error(e);
     }
-  }
-};
 
+    setReservation({
+      item: "",
+      date: "",
+      quantity: 1,
+      time: "",
+    });
+  };
+
+  const handleCancelReservation = async (res) => {
+    // only allow cancel if still pending
+    if (res.status !== "pending") {
+      toast.info("This reservation can’t be cancelled.");
+      return;
+    }
+
+    await cancelReservations(res.id);
+    toast.info("Reservation cancelled.");
+
+    if (res.pointsAwarded) {
+      try {
+        await updateDoc(doc(db, "users", authUser.uid), {
+          points: increment(-10),
+        });
+        toast.info("-10 loyalty points");
+      } catch (e) {
+        toast.error("Failed to update points.");
+        console.error(e);
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Loading...
+      </div>
+    );
+  }
+
+  const loyaltyPoints = authUser?.points ?? 0;
+  const customerName = authUser?.name || "Customer";
 
   const timeSlots = generateTimeSlots();
   const dates = generateDates();
@@ -287,45 +454,14 @@ const handleCancelReservation = async (res) => {
 
               <hr className="border-gray-200" />
 
-              {/* Update Email */}
-              <div className="space-y-3">
-                <h3 className="font-bold text-gray-700">Change Email</h3>
-                <input
-                  type="email"
-                  name="newEmail"
-                  placeholder="New email"
-                  value={settingsForm.newEmail}
-                  onChange={handleSettingsChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:outline-none transition"
-                />
-                <input
-                  type="password"
-                  name="currentPassword"
-                  placeholder="Current password (required)"
-                  value={settingsForm.currentPassword}
-                  onChange={handleSettingsChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:outline-none transition"
-                />
-                <button
-                  onClick={handleUpdateEmail}
-                  disabled={settingsLoading}
-                  className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 rounded-lg transition disabled:opacity-60"
-                  type="button"
-                >
-                  Update Email
-                </button>
-              </div>
-
-              <hr className="border-gray-200" />
-
               {/* Update Password */}
               <div className="space-y-3">
                 <h3 className="font-bold text-gray-700">Change Password</h3>
                 <input
                   type="password"
-                  name="currentPassword"
+                  name="currentPasswordForPassword"
                   placeholder="Current password"
-                  value={settingsForm.currentPassword}
+                  value={settingsForm.currentPasswordForPassword}
                   onChange={handleSettingsChange}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:outline-none transition"
                 />
@@ -468,7 +604,98 @@ const handleCancelReservation = async (res) => {
           <div className={`${card} ${cardPad}`}>
             <h3 className="text-lg sm:text-xl font-bold mb-4">My Reservations</h3>
 
-            {myReservations.length === 0 ? (
+            <div className="flex flex-col gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Filter by date
+                </label>
+
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setQuickFilter("all")}
+                    className={`w-full px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold border transition whitespace-nowrap ${
+                      quickFilter === "all"
+                        ? "bg-orange-600 text-white border-orange-600"
+                        : "bg-white text-gray-700 border-gray-300 hover:border-orange-400"
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuickFilter("today");
+                      setFilterDate("");
+                    }}
+                    className={`w-full px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold border transition whitespace-nowrap ${
+                      quickFilter === "today"
+                        ? "bg-orange-600 text-white border-orange-600"
+                        : "bg-white text-gray-700 border-gray-300 hover:border-orange-400"
+                    }`}
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuickFilter("week");
+                      setFilterDate("");
+                    }}
+                    className={`w-full col-span-2 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold border transition whitespace-nowrap ${
+                      quickFilter === "week"
+                        ? "bg-orange-600 text-white border-orange-600"
+                        : "bg-white text-gray-700 border-gray-300 hover:border-orange-400"
+                    }`}
+                  >
+                    This Week
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="date"
+                    value={filterDate}
+                    onChange={(e) => {
+                      setFilterDate(e.target.value);
+                    }}
+                    disabled={quickFilter !== "all"}
+                    className="flex-1 min-w-[160px] border rounded-lg px-3 py-2 disabled:bg-gray-100 disabled:text-gray-500"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterDate("");
+                      setQuickFilter("all");
+                    }}
+                    className="shrink-0 px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold border border-gray-300 bg-white text-gray-700 hover:border-orange-400 transition"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Sort by
+                </label>
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 bg-white"
+                >
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                </select>
+              </div>
+            </div>
+
+            {loadingReservations ? (
+              <div className="text-center py-6 text-gray-600">Loading reservations...</div>
+            ) : pendingFiltered.length === 0 &&
+              completedFiltered.length === 0 &&
+              cancelledFiltered.length === 0 ? (
               <div className="text-center py-6">
                 <div className="text-gray-600 font-medium">No reservations yet</div>
                 <div className="text-sm text-gray-500 mt-1">
@@ -488,65 +715,46 @@ const handleCancelReservation = async (res) => {
                 </button>
               </div>
             ) : (
-              <div className="space-y-3 max-h-64 overflow-y-auto">
-                {myReservations.map((res) => {
-                  return (
-                    <div
-                      key={res.id}
-                      className="bg-orange-50 p-3 rounded-xl border border-orange-200"
-                    >
-                      <div className="flex justify-between items-start mb-2 gap-3">
-                        <div className="font-bold text-base sm:text-lg">
-                          {res.itemName}
-                        </div>
-
-                        <button
-                          onClick={() => handleCancelReservation(res)}
-                          className="text-red-600 hover:text-red-800 font-bold"
-                        >
-                          ✕
-                        </button>
-                      </div>
-
-                      <div className="text-sm text-gray-700 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Calendar size={16} />
-                          <span>
-                            {new Date(res.date).toLocaleDateString("en-US", {
-                              weekday: "short",
-                              month: "short",
-                              day: "numeric",
-                            })}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <Clock size={16} />
-                          <span>{res.time}</span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <Package size={16} />
-                          <span>Quantity: {res.quantity}</span>
-                        </div>
-
-                        <div className="mt-2">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-bold ${
-                              res.status === "pending"
-                                ? "bg-yellow-200 text-yellow-800"
-                                : res.status === "completed"
-                                ? "bg-green-200 text-green-800"
-                                : "bg-gray-200 text-gray-800"
-                            }`}
-                          >
-                            {res.status.toUpperCase()}
-                          </span>
-                        </div>
-                      </div>
+              <div className="max-h-64 overflow-y-auto">
+                {/* PENDING */}
+                {pendingFiltered.length > 0 && (
+                  <>
+                    <h4 className="font-bold mt-3 mb-2">Pending</h4>
+                    <div className="space-y-3">
+                      {pendingSorted.map((res) => (
+                        <ReservationCard
+                          key={res.id}
+                          res={res}
+                          onCancel={handleCancelReservation}
+                        />
+                      ))}
                     </div>
-                  );
-                })}
+                  </>
+                )}
+
+                {/* COMPLETED */}
+                {completedFiltered.length > 0 && (
+                  <>
+                    <h4 className="font-bold mt-4 mb-2">Completed</h4>
+                    <div className="space-y-3">
+                      {completedSorted.map((res) => (
+                        <ReservationCard key={res.id} res={res} />
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* CANCELLED */}
+                {cancelledFiltered.length > 0 && (
+                  <>
+                    <h4 className="font-bold mt-4 mb-2">Cancelled</h4>
+                    <div className="space-y-3">
+                      {cancelledSorted.map((res) => (
+                        <ReservationCard key={res.id} res={res} />
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>

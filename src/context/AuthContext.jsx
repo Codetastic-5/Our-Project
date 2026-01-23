@@ -5,7 +5,6 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
-  updateEmail,
   updatePassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
@@ -29,6 +28,8 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
         return;
       }
+
+      console.log("providers:", auth.currentUser?.providerData);
 
       setLoading(true);
 
@@ -84,25 +85,15 @@ export const AuthProvider = ({ children }) => {
     await reauthenticateWithCredential(auth.currentUser, credential);
   };
 
-  // Update user's email
-  const updateUserEmail = async (newEmail, currentPassword) => {
-    await reauthenticate(currentPassword);
-    await updateEmail(auth.currentUser, newEmail);
-  };
-
   // Update user's password
-  const updateUserPassword = async (newPassword, currentPassword) => {
+  const updateUserPasswordWithReauth = async (newPassword, currentPassword) => {
     await reauthenticate(currentPassword);
-    await updatePassword(auth.currentUser, newPassword);
+    await updateUserPassword(newPassword);
   };
 
   // Update user's name in Firestore
   const updateUserName = async (newName) => {
-    if (!auth.currentUser) throw new Error("Not logged in");
-    console.log("Updating name to:", newName, "for user:", auth.currentUser.uid);
-    const userRef = doc(db, "users", auth.currentUser.uid);
-    await updateDoc(userRef, { name: newName });
-    console.log("Name updated successfully in Firestore");
+    await updateUsername(newName);
   };
 
   return (
@@ -112,8 +103,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         login,
         logout,
-        updateUserEmail,
-        updateUserPassword,
+        updateUserPassword: updateUserPasswordWithReauth,
         updateUserName,
       }}
     >
@@ -127,3 +117,19 @@ export const useAuth = () => {
   if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
   return ctx;
 };
+
+export async function updateUsername(newName) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Not logged in");
+
+  await updateDoc(doc(db, "users", uid), {
+    name: newName,
+  });
+}
+
+export async function updateUserPassword(newPassword) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in");
+
+  await updatePassword(user, newPassword);
+}
