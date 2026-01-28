@@ -4,7 +4,7 @@ import Footer from "../components/Footer";
 import { useMenu } from "../context/MenuContext";
 import { useToast } from "../context/ToastContext";
 import { useAuth } from "../context/AuthContext";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../firebase";
 
 const AdminDashboard = ({ onLogout }) => {
@@ -17,6 +17,10 @@ const AdminDashboard = ({ onLogout }) => {
   const [newItemStock, setNewItemStock] = useState("");
   const [newItemPrice, setNewItemPrice] = useState("");
   const [searchUsername, setSearchUsername] = useState("");
+  const [sortBy, setSortBy] = useState('name');
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [minPoints, setMinPoints] = useState("");
+ 
 
   const [customers, setCustomers] = useState([]);
   const [loadingCustomers, setLoadingCustomers] = useState(true);
@@ -51,7 +55,7 @@ const AdminDashboard = ({ onLogout }) => {
             points: typeof data.points === "number" ? data.points : 0,
             role: data.role || "customer",
           };
-        });
+        }).filter((user) => user.role === "customer");
         setCustomers(list);
         setLoadingCustomers(false);
       },
@@ -67,11 +71,38 @@ const AdminDashboard = ({ onLogout }) => {
 
   const filteredCustomers = useMemo(() => {
     const term = searchUsername.trim().toLowerCase();
-    if (!term) return customers;
-    return customers.filter((customer) =>
+    let filtered = customers.filter((customer) =>
       String(customer?.name || "").toLowerCase().includes(term)
     );
-  }, [customers, searchUsername]);
+
+    // Filter by minimum points
+    const min = parseInt(minPoints);
+    if (!isNaN(min) && min > 0) {
+      filtered = filtered.filter((customer) => customer.points >= min);
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      let aVal, bVal;
+      if (sortBy === 'points') {
+        aVal = a.points;
+        bVal = b.points;
+      } else if (sortBy === 'role') {
+        aVal = String(a.role || "").toLowerCase();
+        bVal = String(b.role || "").toLowerCase();
+      } else {
+        aVal = String(a.name || "").toLowerCase();
+        bVal = String(b.name || "").toLowerCase();
+      }
+      if (sortOrder === 'asc') {
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      } else {
+        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+      }
+    });
+
+    return filtered;
+  }, [customers, searchUsername, minPoints, sortBy, sortOrder]);
 
   const handleAddMenuItem = () => {
     if (!newItemName.trim()) {
@@ -100,6 +131,17 @@ const AdminDashboard = ({ onLogout }) => {
   const handleDeleteItem = (itemId, itemName) => {
     deleteMenuItem(itemId);
     toast.info(`"${itemName}" removed from menu.`);
+  };
+
+  const handleDeleteCustomer = async (customerId, customerName) => {
+    if (!confirm(`Are you sure you want to delete ${customerName}? This will remove their data from the system.`)) return;
+    try {
+      await deleteDoc(doc(db, "users", customerId));
+      toast.success(`${customerName} deleted successfully.`);
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast.error("Failed to delete customer.");
+    }
   };
 
   const handleSearch = () => {
@@ -258,6 +300,34 @@ const AdminDashboard = ({ onLogout }) => {
                 {((searchUsername.trim() === "" ? customers.length : filteredCustomers.length) || 0) !== 1 ? "s" : ""}
               </div>
 
+              {/* Sort Bar */}
+              <div className="flex gap-3 mb-6 items-center">
+                <span className="text-sm font-medium text-gray-700">Sort by:</span>
+                <select
+                  value={`${sortBy}-${sortOrder}`}
+                  onChange={(e) => {
+                    const [by, order] = e.target.value.split('-');
+                    setSortBy(by);
+                    setSortOrder(order);
+                  }}
+                  className="border-2 border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-orange-500 text-gray-700 text-sm"
+                >
+                  <option value="name-asc">Name (A-Z)</option>
+                  <option value="name-desc">Name (Z-A)</option>
+                  <option value="points-asc">Points (Low to High)</option>
+                  <option value="points-desc">Points (High to Low)</option>
+                 
+                </select>
+                <input
+                  type="number"
+                  value={minPoints}
+                  onChange={(e) => setMinPoints(e.target.value)}
+                  placeholder="Min Points"
+                  min="0"
+                  className="border-2 border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-orange-500 text-gray-700 text-sm w-24"
+                />
+              </div>
+
               {/* Customer List */}
               <div className="max-h-96 overflow-auto border border-gray-200 rounded-lg">
                 {!isStaff ? (
@@ -274,10 +344,15 @@ const AdminDashboard = ({ onLogout }) => {
                   <table className="min-w-full text-sm">
                     <thead className="bg-gray-50 text-gray-700 sticky top-0">
                       <tr>
-                        <th className="text-left font-bold px-4 py-3">Name</th>
+                        <th className="text-left font-bold px-4 py-3">
+                          Name
+                        </th>
                         <th className="text-left font-bold px-4 py-3">Email</th>
-                        <th className="text-left font-bold px-4 py-3">Points</th>
+                        <th className="text-left font-bold px-4 py-3">
+                          Points
+                        </th>
                         <th className="text-left font-bold px-4 py-3">Role</th>
+                        
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
@@ -297,6 +372,14 @@ const AdminDashboard = ({ onLogout }) => {
                               {String(customer.role || "customer").toUpperCase()}
                             </span>
                           </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => handleDeleteCustomer(customer.id, customer.name || "Unknown")}
+                              className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded font-bold text-xs transition"
+                            >
+                              Delete
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -308,6 +391,7 @@ const AdminDashboard = ({ onLogout }) => {
         </div>
       </main>
 
+    
       <Footer />
     </div>
   );

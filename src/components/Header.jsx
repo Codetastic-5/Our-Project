@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Menu as MenuIcon } from "lucide-react";
 
-const Header = ({ isLoggedIn, onLogout, role = "customer" }) => {
+const Header = ({ isLoggedIn, onLogout, role = "customer", onPointsClick }) => {
   const [activeTab, setActiveTab] = useState("menu");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -23,7 +23,7 @@ const Header = ({ isLoggedIn, onLogout, role = "customer" }) => {
   // If user loads page with a hash (#menu etc), set active tab
   useEffect(() => {
     const hash = window.location.hash.replace("#", "");
-    if (hash === "menu" || hash === "reservation" || hash === "points") {
+    if (hash === "menu" || hash === "reservation") {
       setActiveTab(hash);
     }
   }, []);
@@ -74,9 +74,6 @@ const Header = ({ isLoggedIn, onLogout, role = "customer" }) => {
                       className={tabClass("reservation")}
                     >
                       Reservation
-                    </button>
-                    <button type="button" onClick={() => goTo("points")} className={tabClass("points")}>
-                      Points
                     </button>
                   </>
                 )}
@@ -129,9 +126,6 @@ const Header = ({ isLoggedIn, onLogout, role = "customer" }) => {
               </button>
               <button type="button" onClick={() => goTo("reservation")} className={mobileTabClass("reservation")}>
                 Reservation
-              </button>
-              <button type="button" onClick={() => goTo("points")} className={mobileTabClass("points")}>
-                Points
               </button>
             </>
           )}
