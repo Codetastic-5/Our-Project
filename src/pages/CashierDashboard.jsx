@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useMenu } from "../context/MenuContext";
 import { useReservations } from "../context/ReservationContext";
 import { useToast } from "../context/ToastContext";
-import { ChevronDown, ChevronRight, Check, X, Calendar, Clock, Package, Search, UserCheck, UserX } from "lucide-react";
+import { ChevronDown, ChevronRight, Check, X, Search, UserCheck, UserX } from "lucide-react";
 import { db } from "../firebase";
 import { collection, query, where, getDocs, doc, updateDoc, increment } from "firebase/firestore";
 
@@ -12,8 +12,11 @@ const CashierDashboard = ({ onLogout }) => {
   const toast = useToast();
 
   const { menuItems } = useMenu();
-  const { getPendingReservations, completeReservation, cancelReservation } =
-    useReservations();
+  const {
+    reservations,
+    loadingReservations,
+    setReservationStatus,
+  } = useReservations();
 
   const [cart, setCart] = useState([]);
   const [username, setUsername] = useState("");
@@ -23,7 +26,61 @@ const CashierDashboard = ({ onLogout }) => {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [showReservations, setShowReservations] = useState(true);
 
-  const pendingReservations = getPendingReservations();
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+
+  const getReservationDateString = (reservation) => {
+    if (!reservation) return "";
+    if (typeof reservation.date === "string") return reservation.date;
+    if (typeof reservation.date?.toDate === "function") {
+      const d = reservation.date.toDate();
+      if (d instanceof Date && !Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    }
+    return "";
+  };
+
+  const formatYmd = (ymd) => {
+    if (!ymd || typeof ymd !== "string") return "";
+    const [y, m, d] = ymd.split("-").map((x) => parseInt(x, 10));
+    if (!y || !m || !d) return ymd;
+    const dt = new Date(y, m - 1, d);
+    if (Number.isNaN(dt.getTime())) return ymd;
+    return dt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  };
+
+  const filteredReservations = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return (reservations || []).filter((r) => {
+      const status = String(r?.status || "").toLowerCase();
+      if (statusFilter !== "all" && status !== statusFilter) return false;
+
+      const dateStr = getReservationDateString(r);
+      if (startDate && (!dateStr || dateStr < startDate)) return false;
+      if (endDate && (!dateStr || dateStr > endDate)) return false;
+
+      if (!normalizedSearch) return true;
+
+      const haystack = [
+        r?.customerName,
+        r?.customerEmail,
+        r?.customerUid,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(normalizedSearch);
+    });
+  }, [reservations, statusFilter, startDate, endDate, searchTerm]);
+
+  const pendingCount = useMemo(
+    () => (reservations || []).filter((r) => String(r?.status || "").toLowerCase() === "pending").length,
+    [reservations]
+  );
 
   // Search for customer by name
   const handleSearchCustomer = async () => {
@@ -147,9 +204,18 @@ const CashierDashboard = ({ onLogout }) => {
     }
   };
 
-  const handleCompleteReservation = (id) => {
-    completeReservation(id);
-    toast.success("Reservation completed.");
+  const handleUpdateReservationStatus = async (id, status) => {
+    if (!id) return;
+    setActionLoadingId(id);
+    try {
+      await setReservationStatus(id, status);
+      toast.success(`Reservation ${status}.`);
+    } catch (e) {
+      console.error("Update reservation status error:", e);
+      toast.error("Failed to update reservation.");
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
   const card =
@@ -170,7 +236,7 @@ const CashierDashboard = ({ onLogout }) => {
               onClick={() => setShowReservations(!showReservations)}
             >
               <h2 className={sectionTitle}>
-                RESERVATIONS ({pendingReservations.length})
+                RESERVATIONS ({pendingCount})
               </h2>
               <span className="text-2xl">
                 {showReservations ? <ChevronDown /> : <ChevronRight />}
@@ -178,76 +244,161 @@ const CashierDashboard = ({ onLogout }) => {
             </div>
 
             {showReservations && (
-              <div className="p-4 space-y-3 max-h-96 overflow-y-auto">
-                {pendingReservations.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">
-                    No pending reservations
-                  </p>
-                ) : (
-                  pendingReservations.map((res) => {
-                    const formattedDate = new Date(res.date).toLocaleDateString(
-                      "en-US",
-                      { weekday: "short", month: "short", day: "numeric" }
-                    );
-
-                    return (
-                      <div
-                        key={res.id}
-                        className="bg-purple-50 border border-purple-200 rounded-xl p-4"
+              <div className="p-4 space-y-4">
+                {/* Filters */}
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
+                        Status
+                      </label>
+                      <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="w-full border rounded-lg px-3 py-2 bg-white"
                       >
-                        <div className="flex justify-between items-start mb-2 gap-3">
-                          <div>
-                            <div className="font-bold text-lg">{res.itemName}</div>
-                            <div className="text-sm text-gray-600">
-                              by {res.customerName}
-                            </div>
-                          </div>
-                          <span className="bg-yellow-400 text-yellow-900 px-2 py-1 rounded-full text-xs font-bold whitespace-nowrap">
-                            PENDING
-                          </span>
-                        </div>
+                        <option value="all">All</option>
+                        <option value="pending">Pending</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
 
-                        <div className="text-sm space-y-1 mb-3">
-                          <div className="flex items-center gap-2">
-                            <Calendar size={16} />
-                            <span>{formattedDate}</span>
-                          </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
+                        Start date
+                      </label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-full border rounded-lg px-3 py-2"
+                      />
+                    </div>
 
-                          <div className="flex items-center gap-2">
-                            <Clock size={16} />
-                            <span>{res.time}</span>
-                          </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
+                        End date
+                      </label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full border rounded-lg px-3 py-2"
+                      />
+                    </div>
+                  </div>
 
-                          <div className="flex items-center gap-2">
-                            <Package size={16} />
-                            <span>Qty: {res.quantity}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            onClick={() => handleCompleteReservation(res.id)}
-                            className="flex-1 min-w-[140px] bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg transition flex items-center justify-center gap-2"
-                            type="button"
-                          >
-                            <Check size={18} />
-                            Complete
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              cancelReservation(res.id);
-                              toast.info("Reservation cancelled.");
-                            }}
-                            className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 rounded-lg transition flex items-center justify-center"
-                            type="button"
-                          >
-                            <X size={18} />
-                          </button>
-                        </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Search (name, email, uid)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="w-full border rounded-lg pl-10 pr-3 py-2"
+                          placeholder="Search customer..."
+                        />
                       </div>
-                    );
-                  })
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStatusFilter("all");
+                          setStartDate("");
+                          setEndDate("");
+                          setSearchTerm("");
+                        }}
+                        className="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold border border-gray-300 bg-white text-gray-700 hover:border-purple-400 transition"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Table */}
+                {loadingReservations ? (
+                  <div className="text-center py-6 text-gray-600">Loading reservations...</div>
+                ) : filteredReservations.length === 0 ? (
+                  <div className="text-center py-6 text-gray-500">
+                    No reservations match your filters.
+                  </div>
+                ) : (
+                  <div className="max-h-96 overflow-auto border border-gray-200 rounded-xl">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-gray-50 text-gray-700">
+                        <tr>
+                          <th className="text-left font-bold px-4 py-3">Item</th>
+                          <th className="text-left font-bold px-4 py-3">Customer</th>
+                          <th className="text-left font-bold px-4 py-3">Date + Time</th>
+                          <th className="text-left font-bold px-4 py-3">Qty</th>
+                          <th className="text-left font-bold px-4 py-3">Status</th>
+                          <th className="text-left font-bold px-4 py-3">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 bg-white">
+                        {filteredReservations.map((res) => {
+                          const status = String(res?.status || "").toLowerCase();
+                          const isFinal = status === "completed" || status === "cancelled";
+                          const dateStr = getReservationDateString(res);
+                          const statusClasses =
+                            status === "pending"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : status === "completed"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-gray-100 text-gray-700";
+
+                          return (
+                            <tr key={res.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 font-semibold text-gray-800">
+                                {res?.itemName || "(unknown)"}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="font-semibold text-gray-800">{res?.customerName || "(unknown)"}</div>
+                                <div className="text-xs text-gray-500 break-all">{res?.customerUid || ""}</div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="text-gray-800">{formatYmd(dateStr)}</div>
+                                <div className="text-xs text-gray-500">{res?.time || ""}</div>
+                              </td>
+                              <td className="px-4 py-3">{res?.quantity ?? ""}</td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex px-2 py-1 rounded-full text-xs font-bold ${statusClasses}`}>
+                                  {String(res?.status || "").toUpperCase()}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateReservationStatus(res.id, "completed")}
+                                    disabled={isFinal || actionLoadingId === res.id}
+                                    className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-2 rounded-lg transition disabled:opacity-60"
+                                  >
+                                    <Check size={16} />
+                                    Complete
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateReservationStatus(res.id, "cancelled")}
+                                    disabled={isFinal || actionLoadingId === res.id}
+                                    className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-2 rounded-lg transition disabled:opacity-60"
+                                    title="Cancel"
+                                  >
+                                    <X size={16} />
+                                    Cancel
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             )}

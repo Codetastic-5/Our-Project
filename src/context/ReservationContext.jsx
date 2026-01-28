@@ -1,67 +1,114 @@
-import { createContext, useState, useContext } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { db } from "../firebase";
+import { useAuth } from "./AuthContext";
+import {
+  addDoc,
+  collection,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
+  doc,
+  where,
+} from "firebase/firestore";
 
-const ReservationContext = createContext()
+const ReservationContext = createContext(null);
 
 export const useReservations = () => {
-  const context = useContext(ReservationContext)
-  if (!context) {
-    throw new Error('useReservations must be used within ReservationProvider')
-  }
-  return context
-}
+  const ctx = useContext(ReservationContext);
+  if (!ctx) throw new Error("useReservations must be used within ReservationProvider");
+  return ctx;
+};
 
 export const ReservationProvider = ({ children }) => {
-  const [reservations, setReservations] = useState([])
+  const { user: authUser } = useAuth();
 
-  const addReservation = (reservation) => {
-    const newReservation = {
-      id: Date.now(),
-      ...reservation,
-      createdAt: new Date().toISOString(),
-      status: 'pending' // pending, completed, cancelled
+  const [reservations, setReservations] = useState([]);
+  const [loadingReservations, setLoadingReservations] = useState(true);
+
+  const role = String(authUser?.role || "").toLowerCase();
+  const isStaff = role === "cashier" || role === "admin";
+
+  // ✅ LIVE LISTENER:
+  // - customers: only their reservations
+  // - cashier/admin: all reservations
+  useEffect(() => {
+    if (!authUser?.uid) {
+      setReservations([]);
+      setLoadingReservations(false);
+      return;
     }
-    setReservations(prev => [...prev, newReservation])
-    return newReservation
-  }
 
-  const cancelReservation = (id) => {
-    setReservations(prev =>
-      prev.map(r =>
-        r.id === id
-          ? { ...r, status: "cancelled" }
-          : r
-      )
+    setLoadingReservations(true);
+
+    const q = isStaff
+      ? query(collection(db, "reservations"), orderBy("createdAt", "desc"))
+      : query(
+          collection(db, "reservations"),
+          where("customerUid", "==", authUser.uid),
+          orderBy("createdAt", "desc")
+        );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setReservations(list);
+        setLoadingReservations(false);
+      },
+      (err) => {
+        console.error("reservations snapshot error:", err);
+        setReservations([]);
+        setLoadingReservations(false);
+      }
     );
+
+    return () => unsub();
+  }, [authUser?.uid, isStaff]);
+
+  // ✅ create reservation (this includes the uid)
+  const addReservation = async (reservation) => {
+    if (!authUser?.uid) throw new Error("Not logged in");
+
+    const payload = {
+      ...reservation,
+      customerUid: authUser.uid,   // ✅ always store uid
+      status: "pending",
+      createdAt: serverTimestamp(),
+    };
+
+    const ref = await addDoc(collection(db, "reservations"), payload);
+    return ref.id;
   };
 
-  const completeReservation = (id) => {
-    setReservations(prev => prev.map(r => 
-      r.id === id ? { ...r, status: 'completed' } : r
-    ))
-  }
-
-  const getPendingReservations = () => {
-    return reservations.filter(r => r.status === 'pending')
-  }
-
-  const getCustomerReservations = (customerName) => {
-    return reservations.filter(
-      r => r.customerName === customerName && r.status !== "cancelled"
-    );
+  const cancelReservation = async (id) => {
+    await updateDoc(doc(db, "reservations", id), { status: "cancelled" });
   };
 
-  return (
-    <ReservationContext.Provider value={{ 
-      reservations, 
-      addReservation, 
+  const completeReservation = async (id) => {
+    await updateDoc(doc(db, "reservations", id), { status: "completed" });
+  };
+
+  const setReservationStatus = async (id, status) => {
+    if (!id) throw new Error("Missing reservation id");
+    if (!status) throw new Error("Missing status");
+    await updateDoc(doc(db, "reservations", id), { status });
+  };
+
+  const value = useMemo(
+    () => ({
+      reservations,
+      loadingReservations,
+      addReservation,
       cancelReservation,
       completeReservation,
-      getPendingReservations,
-      getCustomerReservations
-    }}>
-      {children}
-    </ReservationContext.Provider>
-  )
-}
+      setReservationStatus,
+    }),
+    [reservations, loadingReservations]
+  );
 
-export default ReservationContext
+  return <ReservationContext.Provider value={value}>{children}</ReservationContext.Provider>;
+};
+
+export default ReservationContext;
