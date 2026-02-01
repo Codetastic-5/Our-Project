@@ -153,6 +153,15 @@ const CashierDashboard = ({ onLogout }) => {
     return cart.reduce((total, item) => total + item.price * item.quantity, 0);
   };
 
+  // Remove item from cart (void)
+  const removeFromCart = (itemId) => {
+    const itemToRemove = cart.find((i) => i.id === itemId);
+    if (!itemToRemove) return;
+    if (!window.confirm(`Void ${itemToRemove.name} from cart? This will remove it completely.`)) return;
+    setCart(cart.filter((i) => i.id !== itemId));
+    toast.info(`${itemToRemove.name} voided.`);
+  };
+
   // Calculate points earned (10 points per 10 pesos spent)
   const calculatePointsEarned = () => {
     return Math.floor(calculateTotal() / 10) * 20;
@@ -371,27 +380,31 @@ const CashierDashboard = ({ onLogout }) => {
                                 </span>
                               </td>
                               <td className="px-4 py-3">
-                                <div className="flex flex-wrap gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUpdateReservationStatus(res.id, "completed")}
-                                    disabled={isFinal || actionLoadingId === res.id}
-                                    className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-2 rounded-lg transition disabled:opacity-60"
-                                  >
-                                    <Check size={16} />
-                                    Complete
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUpdateReservationStatus(res.id, "cancelled")}
-                                    disabled={isFinal || actionLoadingId === res.id}
-                                    className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-2 rounded-lg transition disabled:opacity-60"
-                                    title="Cancel"
-                                  >
-                                    <X size={16} />
-                                    Cancel
-                                  </button>
-                                </div>
+                                {actionLoadingId === res.id ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="inline-flex items-center gap-2 bg-gray-100 text-gray-600 font-bold px-3 py-2 rounded-lg">Processing...</span>
+                                  </div>
+                                ) : !isFinal ? (
+                                  <div className="flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateReservationStatus(res.id, "completed")}
+                                      className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-2 rounded-lg transition"
+                                    >
+                                      <Check size={16} />
+                                      Complete
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateReservationStatus(res.id, "cancelled")}
+                                       className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-2 rounded-lg transition"
+                                      title="Cancel"
+                                    >
+                                      <X size={16} />
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : null}
                               </td>
                             </tr>
                           );
@@ -576,13 +589,23 @@ const CashierDashboard = ({ onLogout }) => {
                           ₱{item.price} each
                         </span>
                       </div>
-                      <div className="text-right">
-                        <span className="text-lg sm:text-xl text-gray-700">
-                          x{item.quantity}
-                        </span>
-                        <p className="text-sm font-medium text-orange-600">
-                          ₱{item.price * item.quantity}
-                        </p>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <span className="text-lg sm:text-xl text-gray-700">
+                            x{item.quantity}
+                          </span>
+                          <p className="text-sm font-medium text-orange-600">
+                            ₱{item.price * item.quantity}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeFromCart(item.id)}
+                          className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded transition"
+                          title="Void item"
+                        >
+                          <X size={18} />
+                        </button>
                       </div>
                     </div>
                   ))
