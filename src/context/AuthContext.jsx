@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { auth, db } from "../firebase";
-import { doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc, getDoc } from "firebase/firestore";
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -71,8 +71,35 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  const login = (email, password) =>
-    signInWithEmailAndPassword(auth, email, password);
+  // Sign in, and optionally enforce a required role (e.g., { requiredRole: 'cashier' })
+  const login = async (email, password, options = {}) => {
+    // options: { requiredRole: string }
+    const result = await signInWithEmailAndPassword(auth, email, password);
+
+    // If caller requested a required role, verify Firestore user doc
+    const required = options.requiredRole;
+    if (required) {
+      try {
+        const uid = auth.currentUser?.uid;
+        if (!uid) throw new Error("No user after sign-in");
+        const userDoc = await getDoc(doc(db, "users", uid));
+        const role = (userDoc.exists() && userDoc.data().role) || "customer";
+
+        if (String(role).toLowerCase() !== String(required).toLowerCase()) {
+          // Not authorized for this role: immediately sign out and throw an auth-like error
+          await signOut(auth);
+          const err = new Error(`Account is not authorized for role: ${required}`);
+          err.code = "auth/unauthorized";
+          throw err;
+        }
+      } catch (e) {
+        // rethrow for callers to handle
+        throw e;
+      }
+    }
+
+    return result;
+  }; 
 
   const logout = () => signOut(auth);
 

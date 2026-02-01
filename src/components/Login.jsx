@@ -29,7 +29,9 @@ const Login = ({ role, onSwitchMode, onSuccess }) => {
     setErrorMessage("");
 
     try {
-      await login(email, password);
+      // If this Login UI was opened for a specific role, pass it to the login helper to enforce it
+      const opts = role ? { requiredRole: role } : {};
+      await login(email, password, opts);
 
       // role is loaded from Firestore inside AuthContext (user.role)
       toast.success("Logged in successfully!");
@@ -40,7 +42,10 @@ const Login = ({ role, onSwitchMode, onSuccess }) => {
     } catch (err) {
       // common Firebase errors → simple messages
       const code = err?.code || "";
-      if (code.includes("auth/invalid-credential")) {
+
+      if (code.includes("auth/unauthorized")) {
+        setErrorMessage(role ? `Only ${role} accounts can log in here.` : "You are not authorized to log in here.");
+      } else if (code.includes("auth/invalid-credential")) {
         setErrorMessage("Wrong email or password.");
       } else if (code.includes("auth/user-not-found")) {
         setErrorMessage("No account found for this email.");
