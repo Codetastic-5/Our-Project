@@ -61,7 +61,11 @@ function App() {
     <MenuProvider>
       <ReservationProvider>
         <div className="min-h-screen flex flex-col">
-          <Header isLoggedIn={false} />
+          <Header
+            isLoggedIn={false}
+            onCreateClick={() => handleSwitchMode("create")}
+            onLoginClick={() => handleSwitchMode("login")}
+          />
 
           <main className="relative flex-1 flex bg-gradient-to-r from-orange-500 to-orange-300">
             <Hero />

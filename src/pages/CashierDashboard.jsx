@@ -11,7 +11,7 @@ import { collection, query, where, getDocs, doc, updateDoc, increment } from "fi
 const CashierDashboard = ({ onLogout }) => {
   const toast = useToast();
 
-  const { menuItems } = useMenu();
+  const { menuItems, decrementStock } = useMenu();
   const {
     reservations,
     loadingReservations,
@@ -176,6 +176,11 @@ const CashierDashboard = ({ onLogout }) => {
     setCheckoutLoading(true);
 
     try {
+      // Decrement stock for each item in cart
+      cart.forEach(cartItem => {
+        decrementStock(cartItem.id, cartItem.quantity);
+      });
+
       // If a customer is selected, add points to their account
       if (selectedCustomer) {
         const pointsToAdd = calculatePointsEarned();
@@ -218,6 +223,15 @@ const CashierDashboard = ({ onLogout }) => {
     setActionLoadingId(id);
     try {
       await setReservationStatus(id, status);
+      
+      // If completing a reservation, decrement stock
+      if (status === "completed") {
+        const reservation = reservations.find(r => r.id === id);
+        if (reservation && reservation.itemId && reservation.quantity) {
+          decrementStock(reservation.itemId, reservation.quantity);
+        }
+      }
+      
       toast.success(`Reservation ${status}.`);
     } catch (e) {
       console.error("Update reservation status error:", e);
@@ -234,7 +248,7 @@ const CashierDashboard = ({ onLogout }) => {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-100 pt-20">
-      <Header isLoggedIn={true} onLogout={onLogout} role="cashier" />
+      <Header isLoggedIn={true} onLogout={onLogout} role="cashier" hideMenu={true} />
 
       <main className="flex-1 flex flex-col lg:flex-row p-4 sm:p-6 gap-6">
         <aside className="w-full lg:w-96 space-y-6">

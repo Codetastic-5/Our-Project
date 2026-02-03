@@ -5,6 +5,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
+  sendPasswordResetEmail,
   updatePassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
@@ -103,6 +104,11 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => signOut(auth);
 
+  const resetPassword = async (email) => {
+    if (!email) throw new Error("Email is required");
+    await sendPasswordResetEmail(auth, email);
+  };
+
   // Re-authenticate user before sensitive operations
   const reauthenticate = async (currentPassword) => {
     const credential = EmailAuthProvider.credential(
@@ -130,6 +136,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         login,
         logout,
+        resetPassword,
         updateUserPassword: updateUserPasswordWithReauth,
         updateUserName,
       }}

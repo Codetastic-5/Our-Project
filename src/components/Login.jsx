@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 
 const Login = ({ role, onSwitchMode, onSuccess }) => {
-  const { login } = useAuth();
+  const { login, resetPassword } = useAuth();
   const toast = useToast();
 
   const [formData, setFormData] = useState({ identifier: "", password: "" });
@@ -57,6 +57,37 @@ const Login = ({ role, onSwitchMode, onSuccess }) => {
         setErrorMessage("Login failed. Please try again.");
       }
       toast.error("Login failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    const email = formData.identifier.trim();
+
+    if (!email) {
+      setErrorMessage("Please enter your email to reset your password.");
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage("");
+
+    try {
+      await resetPassword(email);
+      toast.success("Password reset email sent.");
+    } catch (err) {
+      const code = err?.code || "";
+      if (code.includes("auth/user-not-found")) {
+        setErrorMessage("No account found for this email.");
+      } else if (code.includes("auth/invalid-email")) {
+        setErrorMessage("Please enter a valid email.");
+      } else if (code.includes("auth/too-many-requests")) {
+        setErrorMessage("Too many attempts. Try again later.");
+      } else {
+        setErrorMessage("Failed to send reset email.");
+      }
+      toast.error("Password reset failed.");
     } finally {
       setLoading(false);
     }
@@ -127,7 +158,8 @@ const Login = ({ role, onSwitchMode, onSuccess }) => {
         <button
           className="text-sm text-orange-600 hover:underline"
           type="button"
-          onClick={() => toast.info("Forgot password: not added yet.")}
+          onClick={handleForgotPassword}
+          disabled={loading}
         >
           Forgot password?
         </button>

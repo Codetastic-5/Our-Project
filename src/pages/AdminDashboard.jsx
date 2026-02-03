@@ -156,7 +156,7 @@ const AdminDashboard = ({ onLogout }) => {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-100 pt-20">
-      <Header isLoggedIn={true} onLogout={onLogout} />
+      <Header isLoggedIn={true} onLogout={onLogout} hideMenu={true} />
 
       <main className="flex-1 px-4 sm:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">

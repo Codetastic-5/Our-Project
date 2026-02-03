@@ -396,7 +396,7 @@ console.log("MY RESERVATIONS:", myReservations);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 pt-20">
-      <Header isLoggedIn={true} onLogout={onLogout} />
+      <Header isLoggedIn={true} onLogout={onLogout} hideMenu={true} />
 
       {/* Settings Button */}
       <button
