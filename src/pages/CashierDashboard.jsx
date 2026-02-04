@@ -162,9 +162,10 @@ const CashierDashboard = ({ onLogout }) => {
     toast.info(`${itemToRemove.name} voided.`);
   };
 
-  // Calculate points earned (10 points per 10 pesos spent)
+  // Calculate points earned (5 points per item)
   const calculatePointsEarned = () => {
-    return Math.floor(calculateTotal() / 10) * 20;
+    const totalItems = cart.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    return totalItems * 5;
   };
 
   const handleCheckout = async () => {
@@ -251,7 +252,7 @@ const CashierDashboard = ({ onLogout }) => {
       <Header isLoggedIn={true} onLogout={onLogout} role="cashier" hideMenu={true} />
 
       <main className="flex-1 flex flex-col lg:flex-row p-4 sm:p-6 gap-6">
-        <aside className="w-full lg:w-96 space-y-6">
+        <aside className="w-full lg:flex-[2] space-y-6">
           {/* Reservations */}
           <div className={card}>
             <div
@@ -350,7 +351,7 @@ const CashierDashboard = ({ onLogout }) => {
                     No reservations match your filters.
                   </div>
                 ) : (
-                  <div className="max-h-96 overflow-auto border border-gray-200 rounded-xl">
+                  <div className="max-h-[60vh] overflow-auto border border-gray-200 rounded-xl">
                     <table className="min-w-full text-sm">
                       <thead className="bg-gray-50 text-gray-700">
                         <tr>
@@ -549,7 +550,7 @@ const CashierDashboard = ({ onLogout }) => {
         </aside>
 
         {/* Cart */}
-        <section className="flex-1">
+        <section className="w-full lg:flex-[1]">
           <div className={`${card} h-full flex flex-col`}>
             <div className={`${headerBase} bg-orange-700`}>
               <h2 className={sectionTitle}>CART</h2>
