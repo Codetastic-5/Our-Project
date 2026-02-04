@@ -13,7 +13,6 @@ const Header = ({
   const [activeTab, setActiveTab] = useState("menu");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Smooth scroll helper
   const goTo = (id) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -21,14 +20,11 @@ const Header = ({
     setActiveTab(id);
     setMobileMenuOpen(false);
 
-    // scroll into view smoothly
     el.scrollIntoView({ behavior: "smooth", block: "start" });
 
-    // update URL hash (optional but nice)
     window.history.replaceState(null, "", `#${id}`);
   };
 
-  // If user loads page with a hash (#menu etc), set active tab
   useEffect(() => {
     const hash = window.location.hash.replace("#", "");
     if (hash === "menu" || hash === "reservation") {
@@ -53,7 +49,6 @@ const Header = ({
   return (
     <header className="fixed top-0 left-0 right-0 bg-white shadow-md z-50">
       <div className="w-full flex items-center px-4 h-16">
-        {/* LEFT */}
         <div className="flex items-center gap-3">
           <img
             src="/logo.png"
@@ -65,11 +60,9 @@ const Header = ({
           </h1>
         </div>
 
-        {/* RIGHT */}
         <div className="ml-auto">
           {isLoggedIn ? (
             <>
-              {/* Desktop Navigation */}
               <nav className="hidden sm:flex items-center gap-2 sm:gap-4">
                 {role === "customer" && (
                   <>
@@ -93,7 +86,6 @@ const Header = ({
                 </button>
               </nav>
 
-              {/* Menu Button */}
               {!hideMenu && (
                 <div className="flex items-center gap-2">
                   <button
@@ -132,7 +124,6 @@ const Header = ({
         </div>
       </div>
 
-      {/* Dropdown Menu */}
       {mobileMenuOpen && isLoggedIn && (
         <div className="bg-white/90 border-t border-gray-200 shadow-lg px-4 py-3 space-y-2 backdrop-blur-sm">
           {role === "customer" && (

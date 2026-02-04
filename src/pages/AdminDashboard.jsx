@@ -75,13 +75,11 @@ const AdminDashboard = ({ onLogout }) => {
       String(customer?.name || "").toLowerCase().includes(term)
     );
 
-    // Filter by minimum points
     const min = parseInt(minPoints);
     if (!isNaN(min) && min > 0) {
       filtered = filtered.filter((customer) => customer.points >= min);
     }
 
-    // Sort
     filtered.sort((a, b) => {
       let aVal, bVal;
       if (sortBy === 'points') {
@@ -160,7 +158,6 @@ const AdminDashboard = ({ onLogout }) => {
 
       <main className="flex-1 px-4 sm:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
-          {/* TODAY'S MENU Section */}
           <div className="lg:col-span-1 bg-white rounded-lg shadow-lg overflow-hidden">
             <div className="bg-orange-600 px-8 py-5">
               <h2 className="text-xl font-bold text-white tracking-wide">
@@ -169,7 +166,6 @@ const AdminDashboard = ({ onLogout }) => {
             </div>
 
             <div className="p-6">
-              {/* Add New Item Form at Top */}
               <div className="flex flex-col gap-3 mb-6">
                 <div className="flex gap-2">
                   <input
@@ -213,7 +209,6 @@ const AdminDashboard = ({ onLogout }) => {
                 </div>
               </div>
 
-              {/* Menu Items */}
               <div className="space-y-0 max-h-96 overflow-y-auto">
                 {menuItems.map((item, index) => (
                   <div
@@ -265,7 +260,6 @@ const AdminDashboard = ({ onLogout }) => {
             </div>
           </div>
 
-          {/* CUSTOMERS Section */}
           <div className="lg:col-span-2 bg-white rounded-lg shadow-lg overflow-hidden">
             <div className="bg-orange-600 px-8 py-5">
               <h2 className="text-xl font-bold text-white tracking-wide">
@@ -274,7 +268,6 @@ const AdminDashboard = ({ onLogout }) => {
             </div>
 
             <div className="p-6">
-              {/* Search Bar */}
               <div className="flex gap-3 mb-6">
                 <input
                   type="text"
@@ -294,13 +287,11 @@ const AdminDashboard = ({ onLogout }) => {
                 </button>
               </div>
 
-              {/* Customer Count */}
               <div className="text-sm text-gray-600 font-medium mb-6">
                 {searchUsername.trim() === "" ? customers.length : filteredCustomers.length} User
                 {((searchUsername.trim() === "" ? customers.length : filteredCustomers.length) || 0) !== 1 ? "s" : ""}
               </div>
 
-              {/* Sort Bar */}
               <div className="flex gap-3 mb-6 items-center">
                 <span className="text-sm font-medium text-gray-700">Sort by:</span>
                 <select
@@ -328,7 +319,6 @@ const AdminDashboard = ({ onLogout }) => {
                 />
               </div>
 
-              {/* Customer List */}
               <div className="max-h-96 overflow-auto border border-gray-200 rounded-lg">
                 {!isStaff ? (
                   <div className="text-gray-400 text-center py-16">

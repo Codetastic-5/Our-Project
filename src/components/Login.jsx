@@ -29,18 +29,14 @@ const Login = ({ role, onSwitchMode, onSuccess }) => {
     setErrorMessage("");
 
     try {
-      // If this Login UI was opened for a specific role, pass it to the login helper to enforce it
       const opts = role ? { requiredRole: role } : {};
       await login(email, password, opts);
 
-      // role is loaded from Firestore inside AuthContext (user.role)
       toast.success("Logged in successfully!");
       setFormData({ identifier: "", password: "" });
 
-      // keep your old callback (optional)
       if (onSuccess) onSuccess(role || "customer");
     } catch (err) {
-      // common Firebase errors → simple messages
       const code = err?.code || "";
 
       if (code.includes("auth/unauthorized")) {

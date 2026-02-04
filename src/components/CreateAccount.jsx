@@ -44,13 +44,11 @@ const CreateAccount = ({ onSwitchMode }) => {
     setErrorMessage("");
 
     try {
-      // 1) Create user in Firebase Auth
       const cred = await createUserWithEmailAndPassword(auth, email, password);
 
-      // 2) Create Firestore user doc (role-based routing uses this)
       await setDoc(doc(db, "users", cred.user.uid), {
         role: "customer",
-        name: username, // or use "username" field if you prefer
+        name: username,
         email,
         createdAt: serverTimestamp(),
         points: 0,
@@ -59,10 +57,8 @@ const CreateAccount = ({ onSwitchMode }) => {
       setSuccessMessage("Account created successfully! Redirecting...");
       toast.success("Account created! You can now log in.");
 
-      // Clear fields
       setFormData({ email: "", username: "", password: "" });
 
-      // Go to login tab after a short delay (same behavior as before)
       window.setTimeout(() => {
         setSuccessMessage("");
         if (onSwitchMode) onSwitchMode("login", null);

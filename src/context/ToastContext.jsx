@@ -43,7 +43,6 @@ export const ToastProvider = ({ children }) => {
     <ToastContext.Provider value={api}>
       {children}
 
-      {/* Toast UI */}
       <div className="fixed top-20 right-4 z-[9999] space-y-3">
         {toasts.map((t) => (
           <div
