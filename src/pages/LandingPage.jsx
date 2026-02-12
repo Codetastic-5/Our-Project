@@ -4,7 +4,7 @@ const LandingPage = ({ onOpenLogin }) => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
       <div className="text-center">
-        <div className="text-2xl font-bold text-gray-800">SMART LOYALTY</div>
+        <div className="text-2xl font-bold text-gray-800">StockTastic</div>
         <div className="text-sm text-gray-500 mt-2">
           Reserve items and earn loyalty points.
         </div>

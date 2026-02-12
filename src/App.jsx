@@ -10,17 +10,11 @@ import { MenuProvider } from "./context/MenuContext";
 import { ReservationProvider } from "./context/ReservationContext";
 import { useAuth } from "./context/AuthContext";
 import "./App.css";
-
-
-// IMPORTANT:
-// Use the Firebase Login page (the one we made earlier).
-// If your Firebase login file is in src/pages/Login.jsx, use this import:
 import Login from "./components/Login";
 
 function App() {
   const { user, logout } = useAuth();
 
-  // this controls your old homepage switching (create vs login)
   const [mode, setMode] = useState("create");
   const [selectedRole, setSelectedRole] = useState(null);
 
@@ -39,7 +33,6 @@ function App() {
     if (role !== undefined) setSelectedRole(role);
   };
 
-  // LOGGED IN (Firebase)
   if (user) {
     return (
       <MenuProvider>
@@ -56,12 +49,15 @@ function App() {
     );
   }
 
-  // NOT LOGGED IN (Old homepage)
   return (
     <MenuProvider>
       <ReservationProvider>
         <div className="min-h-screen flex flex-col">
-          <Header isLoggedIn={false} />
+          <Header
+            isLoggedIn={false}
+            onCreateClick={() => handleSwitchMode("create")}
+            onLoginClick={() => handleSwitchMode("login")}
+          />
 
           <main className="relative flex-1 flex bg-gradient-to-r from-orange-500 to-orange-300">
             <Hero />
@@ -69,16 +65,12 @@ function App() {
             {mode === "create" ? (
               <CreateAccount
                 onSwitchMode={handleSwitchMode}
-                // For now, after create account we just go to login screen.
-                // Later we can connect CreateAccount to Firebase createUserWithEmailAndPassword.
                 onSuccess={() => setMode("login")}
               />
             ) : (
               <Login
-                // Your selectedRole can be used just for UI text.
                 role={selectedRole}
                 onSwitchMode={handleSwitchMode}
-                // If your Login page doesn’t support onBack/onSuccess, remove these props.
                 onBack={handleGoHome}
               />
             )}

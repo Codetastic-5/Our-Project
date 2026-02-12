@@ -13,7 +13,7 @@ const Footer = ({ onSelectRole, onGoHome, showLinks = true }) => {
   return (
     <footer className="bg-orange-600 text-white text-center py-3">
       <p className="text-sm">
-        © Smart Loyalty
+        © StockTastic
         {showLinks && (
           <>
             &nbsp;|&nbsp; 

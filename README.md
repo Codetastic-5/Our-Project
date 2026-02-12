@@ -1,6 +1,6 @@
-# Smart Loyalty System
+# StockTastic System
 
-A web-based **Smart Loyalty & Reservation System** built with **React, Tailwind CSS, and Firebase**.
+A web-based **StockTastic & Reservation System** built with **React, Tailwind CSS, and Firebase**.
 
 This project allows customers to reserve items, earn loyalty points, and manage reservations, while cashiers can manage menus, view reservations, and process orders.
 

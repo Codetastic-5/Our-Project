@@ -5,6 +5,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
+  sendPasswordResetEmail,
   updatePassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
@@ -20,7 +21,6 @@ export const AuthProvider = ({ children }) => {
     let userUnsub = null;
 
     const authUnsub = onAuthStateChanged(auth, (currentUser) => {
-      // stop previous Firestore listener (if any)
       if (userUnsub) userUnsub();
 
       if (!currentUser) {
@@ -35,7 +35,6 @@ export const AuthProvider = ({ children }) => {
 
       const userRef = doc(db, "users", currentUser.uid);
 
-      // ✅ live listener to Firestore user doc
       userUnsub = onSnapshot(
         userRef,
         (snap) => {
@@ -71,12 +70,9 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  // Sign in, and optionally enforce a required role (e.g., { requiredRole: 'cashier' })
   const login = async (email, password, options = {}) => {
-    // options: { requiredRole: string }
     const result = await signInWithEmailAndPassword(auth, email, password);
 
-    // If caller requested a required role, verify Firestore user doc
     const required = options.requiredRole;
     if (required) {
       try {
@@ -86,14 +82,12 @@ export const AuthProvider = ({ children }) => {
         const role = (userDoc.exists() && userDoc.data().role) || "customer";
 
         if (String(role).toLowerCase() !== String(required).toLowerCase()) {
-          // Not authorized for this role: immediately sign out and throw an auth-like error
           await signOut(auth);
           const err = new Error(`Account is not authorized for role: ${required}`);
           err.code = "auth/unauthorized";
           throw err;
         }
       } catch (e) {
-        // rethrow for callers to handle
         throw e;
       }
     }
@@ -103,7 +97,11 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => signOut(auth);
 
-  // Re-authenticate user before sensitive operations
+  const resetPassword = async (email) => {
+    if (!email) throw new Error("Email is required");
+    await sendPasswordResetEmail(auth, email);
+  };
+
   const reauthenticate = async (currentPassword) => {
     const credential = EmailAuthProvider.credential(
       auth.currentUser.email,
@@ -112,13 +110,11 @@ export const AuthProvider = ({ children }) => {
     await reauthenticateWithCredential(auth.currentUser, credential);
   };
 
-  // Update user's password
   const updateUserPasswordWithReauth = async (newPassword, currentPassword) => {
     await reauthenticate(currentPassword);
     await updateUserPassword(newPassword);
   };
 
-  // Update user's name in Firestore
   const updateUserName = async (newName) => {
     await updateUsername(newName);
   };
@@ -130,6 +126,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         login,
         logout,
+        resetPassword,
         updateUserPassword: updateUserPasswordWithReauth,
         updateUserName,
       }}

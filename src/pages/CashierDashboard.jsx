@@ -11,7 +11,7 @@ import { collection, query, where, getDocs, doc, updateDoc, increment } from "fi
 const CashierDashboard = ({ onLogout }) => {
   const toast = useToast();
 
-  const { menuItems } = useMenu();
+  const { menuItems, decrementStock } = useMenu();
   const {
     reservations,
     loadingReservations,
@@ -82,7 +82,6 @@ const CashierDashboard = ({ onLogout }) => {
     [reservations]
   );
 
-  // Search for customer by name
   const handleSearchCustomer = async () => {
     if (!username.trim()) {
       toast.error("Please enter a username to search.");
@@ -120,7 +119,6 @@ const CashierDashboard = ({ onLogout }) => {
     }
   };
 
-  // Select customer for current transaction
   const handleSelectCustomer = () => {
     if (customerInfo) {
       setSelectedCustomer(customerInfo);
@@ -128,7 +126,6 @@ const CashierDashboard = ({ onLogout }) => {
     }
   };
 
-  // Clear selected customer
   const handleClearCustomer = () => {
     setSelectedCustomer(null);
     toast.info("Customer unlinked from transaction");
@@ -153,7 +150,6 @@ const CashierDashboard = ({ onLogout }) => {
     return cart.reduce((total, item) => total + item.price * item.quantity, 0);
   };
 
-  // Remove item from cart (void)
   const removeFromCart = (itemId) => {
     const itemToRemove = cart.find((i) => i.id === itemId);
     if (!itemToRemove) return;
@@ -162,9 +158,9 @@ const CashierDashboard = ({ onLogout }) => {
     toast.info(`${itemToRemove.name} voided.`);
   };
 
-  // Calculate points earned (10 points per 10 pesos spent)
   const calculatePointsEarned = () => {
-    return Math.floor(calculateTotal() / 10) * 20;
+    const totalItems = cart.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    return totalItems * 5;
   };
 
   const handleCheckout = async () => {
@@ -176,7 +172,10 @@ const CashierDashboard = ({ onLogout }) => {
     setCheckoutLoading(true);
 
     try {
-      // If a customer is selected, add points to their account
+      cart.forEach(cartItem => {
+        decrementStock(cartItem.id, cartItem.quantity);
+      });
+
       if (selectedCustomer) {
         const pointsToAdd = calculatePointsEarned();
         const customerRef = doc(db, "users", selectedCustomer.id);
@@ -187,13 +186,11 @@ const CashierDashboard = ({ onLogout }) => {
 
         toast.success(`Checkout successful! ${selectedCustomer.name} earned ${pointsToAdd} points.`);
         
-        // Update local state to reflect new points
         setSelectedCustomer(prev => ({
           ...prev,
           points: prev.points + pointsToAdd
         }));
         
-        // Also update customerInfo if it's the same customer
         if (customerInfo && customerInfo.id === selectedCustomer.id) {
           setCustomerInfo(prev => ({
             ...prev,
@@ -218,6 +215,14 @@ const CashierDashboard = ({ onLogout }) => {
     setActionLoadingId(id);
     try {
       await setReservationStatus(id, status);
+      
+      if (status === "completed") {
+        const reservation = reservations.find(r => r.id === id);
+        if (reservation && reservation.itemId && reservation.quantity) {
+          decrementStock(reservation.itemId, reservation.quantity);
+        }
+      }
+      
       toast.success(`Reservation ${status}.`);
     } catch (e) {
       console.error("Update reservation status error:", e);
@@ -234,11 +239,10 @@ const CashierDashboard = ({ onLogout }) => {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-100 pt-20">
-      <Header isLoggedIn={true} onLogout={onLogout} role="cashier" />
+      <Header isLoggedIn={true} onLogout={onLogout} role="cashier" hideMenu={true} />
 
       <main className="flex-1 flex flex-col lg:flex-row p-4 sm:p-6 gap-6">
-        <aside className="w-full lg:w-96 space-y-6">
-          {/* Reservations */}
+        <aside className="w-full lg:flex-[2] space-y-6">
           <div className={card}>
             <div
               className={`${headerBase} bg-purple-700 hover:bg-purple-800 cursor-pointer transition`}
@@ -254,7 +258,6 @@ const CashierDashboard = ({ onLogout }) => {
 
             {showReservations && (
               <div className="p-4 space-y-4">
-                {/* Filters */}
                 <div className="grid grid-cols-1 gap-3">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
@@ -328,7 +331,6 @@ const CashierDashboard = ({ onLogout }) => {
                   </div>
                 </div>
 
-                {/* Table */}
                 {loadingReservations ? (
                   <div className="text-center py-6 text-gray-600">Loading reservations...</div>
                 ) : filteredReservations.length === 0 ? (
@@ -336,7 +338,7 @@ const CashierDashboard = ({ onLogout }) => {
                     No reservations match your filters.
                   </div>
                 ) : (
-                  <div className="max-h-96 overflow-auto border border-gray-200 rounded-xl">
+                  <div className="max-h-[60vh] overflow-auto border border-gray-200 rounded-xl">
                     <table className="min-w-full text-sm">
                       <thead className="bg-gray-50 text-gray-700">
                         <tr>
@@ -417,7 +419,6 @@ const CashierDashboard = ({ onLogout }) => {
             )}
           </div>
 
-          {/* Today's Menu */}
           <div className={card}>
             <div className={`${headerBase} bg-orange-700`}>
               <h2 className={sectionTitle}>TODAY'S MENU</h2>
@@ -468,7 +469,6 @@ const CashierDashboard = ({ onLogout }) => {
             </div>
           </div>
 
-          {/* Customers */}
           <div className={card}>
             <div className={`${headerBase} bg-orange-700`}>
               <h2 className={sectionTitle}>CUSTOMERS</h2>
@@ -508,7 +508,6 @@ const CashierDashboard = ({ onLogout }) => {
                     </div>
                   </div>
                   
-                  {/* Select Customer Button */}
                   {selectedCustomer?.id === customerInfo.id ? (
                     <div className="flex items-center justify-center gap-2 bg-green-100 text-green-700 py-2 px-4 rounded-lg">
                       <UserCheck size={18} />
@@ -534,14 +533,12 @@ const CashierDashboard = ({ onLogout }) => {
           </div>
         </aside>
 
-        {/* Cart */}
-        <section className="flex-1">
+        <section className="w-full lg:flex-[1]">
           <div className={`${card} h-full flex flex-col`}>
             <div className={`${headerBase} bg-orange-700`}>
               <h2 className={sectionTitle}>CART</h2>
             </div>
 
-            {/* Selected Customer Banner */}
             {selectedCustomer && (
               <div className="bg-green-50 border-b border-green-200 px-6 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -620,7 +617,6 @@ const CashierDashboard = ({ onLogout }) => {
                   </span>
                 </div>
                 
-                {/* Points to be earned */}
                 {selectedCustomer && cart.length > 0 && (
                   <div className="flex items-center justify-between bg-green-50 rounded-lg px-4 py-2">
                     <span className="text-green-700 font-medium">Points to earn:</span>

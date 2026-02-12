@@ -78,7 +78,6 @@ const CustomerDashboard = ({ onLogout }) => {
     cancelReservation: cancelReservations,
   } = useReservations();
 
-  // State
   const [showSettings, setShowSettings] = useState(false);
   const [filterDate, setFilterDate] = useState("");
   const [sortOrder, setSortOrder] = useState("newest");
@@ -123,8 +122,6 @@ const CustomerDashboard = ({ onLogout }) => {
     if (typeof reservation.date?.toDate === "function") {
       const d = reservation.date.toDate();
       if (d instanceof Date && !Number.isNaN(d.getTime())) {
-        // Note: toISOString is UTC-based; local quick filters use local dates,
-        // but manual date picker values are YYYY-MM-DD and compare directly.
         return d.toISOString().slice(0, 10);
       }
     }
@@ -148,7 +145,6 @@ const CustomerDashboard = ({ onLogout }) => {
         return dateStr === startStr;
       }
 
-      // quickFilter === "week": [today, today+6]
       return dateStr >= startStr && dateStr <= endStr;
     });
   };
@@ -201,7 +197,6 @@ const CustomerDashboard = ({ onLogout }) => {
       const aMs = getCreatedAtMs(a?.createdAt);
       const bMs = getCreatedAtMs(b?.createdAt);
 
-      // Missing timestamps should not crash and should consistently sort last.
       if (aMs == null && bMs == null) return 0;
       if (aMs == null) return 1;
       if (bMs == null) return -1;
@@ -220,7 +215,6 @@ const CustomerDashboard = ({ onLogout }) => {
 
 console.log("MY RESERVATIONS:", myReservations);
 
-  // Handlers
   const handleSettingsChange = (e) => {
     const { name, value } = e.target;
     setSettingsForm((prev) => ({ ...prev, [name]: value }));
@@ -322,10 +316,9 @@ console.log("MY RESERVATIONS:", myReservations);
       (item) => item.id === parseInt(reservation.item)
     )?.name;
 
-    // add reservation locally
     await addReservations({
       customerUid: authUser.uid,
-      customerName, // optional but nice for cashier UI
+      customerName,
       itemId: parseInt(reservation.item),
       itemName,
       date: reservation.date,
@@ -334,7 +327,6 @@ console.log("MY RESERVATIONS:", myReservations);
       pointsAwarded: true,
     });
 
-    // ✅ add +10 points in Firestore (live UI updates because of onSnapshot)
     try {
       await updateDoc(doc(db, "users", authUser.uid), {
         points: increment(10),
@@ -354,7 +346,6 @@ console.log("MY RESERVATIONS:", myReservations);
   };
 
   const handleCancelReservation = async (res) => {
-    // only allow cancel if still pending
     if (res.status !== "pending") {
       toast.info("This reservation can’t be cancelled.");
       return;
@@ -396,9 +387,8 @@ console.log("MY RESERVATIONS:", myReservations);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 pt-20">
-      <Header isLoggedIn={true} onLogout={onLogout} />
+      <Header isLoggedIn={true} onLogout={onLogout} hideMenu={true} />
 
-      {/* Settings Button */}
       <button
         onClick={() => setShowSettings(true)}
         className="fixed bottom-20 right-6 bg-orange-600 hover:bg-orange-700 text-white p-4 rounded-full shadow-lg z-40 transition"
@@ -408,7 +398,6 @@ console.log("MY RESERVATIONS:", myReservations);
         <Settings size={24} />
       </button>
 
-      {/* Settings Modal */}
       {showSettings && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -424,14 +413,12 @@ console.log("MY RESERVATIONS:", myReservations);
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Current Info */}
               <div className="bg-gray-50 p-4 rounded-lg">
                 <p className="text-sm text-gray-500">Current Account</p>
                 <p className="font-semibold">{authUser?.name || "N/A"}</p>
                 <p className="text-gray-600">{authUser?.email || "N/A"}</p>
               </div>
 
-              {/* Update Username */}
               <div className="space-y-3">
                 <h3 className="font-bold text-gray-700">Change Username</h3>
                 <input
@@ -454,7 +441,6 @@ console.log("MY RESERVATIONS:", myReservations);
 
               <hr className="border-gray-200" />
 
-              {/* Update Password */}
               <div className="space-y-3">
                 <h3 className="font-bold text-gray-700">Change Password</h3>
                 <input
@@ -716,7 +702,6 @@ console.log("MY RESERVATIONS:", myReservations);
               </div>
             ) : (
               <div className="max-h-64 overflow-y-auto">
-                {/* PENDING */}
                 {pendingFiltered.length > 0 && (
                   <>
                     <h4 className="font-bold mt-3 mb-2">Pending</h4>
@@ -732,7 +717,6 @@ console.log("MY RESERVATIONS:", myReservations);
                   </>
                 )}
 
-                {/* COMPLETED */}
                 {completedFiltered.length > 0 && (
                   <>
                     <h4 className="font-bold mt-4 mb-2">Completed</h4>
@@ -744,7 +728,6 @@ console.log("MY RESERVATIONS:", myReservations);
                   </>
                 )}
 
-                {/* CANCELLED */}
                 {cancelledFiltered.length > 0 && (
                   <>
                     <h4 className="font-bold mt-4 mb-2">Cancelled</h4>

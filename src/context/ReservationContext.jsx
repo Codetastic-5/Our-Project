@@ -30,9 +30,6 @@ export const ReservationProvider = ({ children }) => {
   const role = String(authUser?.role || "").toLowerCase();
   const isStaff = role === "cashier" || role === "admin";
 
-  // ✅ LIVE LISTENER:
-  // - customers: only their reservations
-  // - cashier/admin: all reservations
   useEffect(() => {
     if (!authUser?.uid) {
       setReservations([]);
@@ -67,13 +64,12 @@ export const ReservationProvider = ({ children }) => {
     return () => unsub();
   }, [authUser?.uid, isStaff]);
 
-  // ✅ create reservation (this includes the uid)
   const addReservation = async (reservation) => {
     if (!authUser?.uid) throw new Error("Not logged in");
 
     const payload = {
       ...reservation,
-      customerUid: authUser.uid,   // ✅ always store uid
+      customerUid: authUser.uid,
       status: "pending",
       createdAt: serverTimestamp(),
     };
