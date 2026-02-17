@@ -422,7 +422,6 @@ const CashierDashboard = ({ onLogout }) => {
           <div className={card}>
             <div className={`${headerBase} bg-orange-700`}>
               <h2 className={sectionTitle}>TODAY'S MENU</h2>
-              <ChevronDown size={20} />
             </div>
 
             <div className="divide-y divide-gray-200">
