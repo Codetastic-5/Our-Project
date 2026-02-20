@@ -1,4 +1,6 @@
-import { createContext, useState, useContext } from 'react'
+import { createContext, useState, useContext, useEffect } from 'react'
+import { collection, onSnapshot, addDoc, deleteDoc, updateDoc, doc } from 'firebase/firestore'
+import { db } from '../firebase'
 
 const MenuContext = createContext()
 
@@ -11,50 +13,86 @@ export const useMenu = () => {
 }
 
 export const MenuProvider = ({ children }) => {
-  const [menuItems, setMenuItems] = useState([
-    { id: 1, name: 'Burger', image: '', stock: 10, price: 85 },
-    { id: 2, name: 'Fries', image: '', stock: 15, price: 45 },
-    { id: 3, name: 'Pizza', image: '', stock: 8, price: 150 },
-    { id: 4, name: 'Soda', image: '', stock: 20, price: 25 },
-    { id: 5, name: 'Salad', image: '', stock: 5, price: 65 },
-    { id: 6, name: 'Ice Cream', image: '', stock: 12, price: 35 }
-  ])
+  const [menuItems, setMenuItems] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const addMenuItem = (itemName, stock = 0, price = 0) => {
-    const newItem = {
-      id: Date.now(),
-      name: itemName,
-      image: '',
-      stock: stock,
-      price: price
+  // Load menu items from Firebase
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, 'menuItems'),
+      (snapshot) => {
+        const items = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        setMenuItems(items)
+        setLoading(false)
+      },
+      (error) => {
+        console.error('Error loading menu items:', error)
+        setLoading(false)
+      }
+    )
+
+    return () => unsubscribe()
+  }, [])
+
+  const addMenuItem = async (itemName, stock = 0, price = 0) => {
+    try {
+      await addDoc(collection(db, 'menuItems'), {
+        name: itemName,
+        image: '',
+        stock: stock,
+        price: price
+      })
+    } catch (error) {
+      console.error('Error adding menu item:', error)
     }
-    setMenuItems([...menuItems, newItem])
   }
 
-  const deleteMenuItem = (itemId) => {
-    setMenuItems(menuItems.filter(item => item.id !== itemId))
+  const deleteMenuItem = async (itemId) => {
+    try {
+      await deleteDoc(doc(db, 'menuItems', itemId))
+    } catch (error) {
+      console.error('Error deleting menu item:', error)
+    }
   }
 
-  const updateStock = (itemId, newStock) => {
-    setMenuItems(menuItems.map(item => 
-      item.id === itemId ? { ...item, stock: newStock } : item
-    ))
+  const updateStock = async (itemId, newStock) => {
+    try {
+      await updateDoc(doc(db, 'menuItems', itemId), {
+        stock: newStock
+      })
+    } catch (error) {
+      console.error('Error updating stock:', error)
+    }
   }
 
-  const decrementStock = (itemId, quantity = 1) => {
-    setMenuItems(menuItems.map(item => 
-      item.id === itemId ? { ...item, stock: Math.max(0, item.stock - quantity) } : item
-    ))
+  const decrementStock = async (itemId, quantity = 1) => {
+    try {
+      const item = menuItems.find(item => item.id === itemId)
+      if (item) {
+        await updateDoc(doc(db, 'menuItems', itemId), {
+          stock: Math.max(0, item.stock - quantity)
+        })
+      }
+    } catch (error) {
+      console.error('Error decrementing stock:', error)
+    }
   }
 
-  const updatePrice = (itemId, newPrice) => {
-    setMenuItems(menuItems.map(item => 
-      item.id === itemId ? { ...item, price: newPrice } : item
-    ))
+  const updatePrice = async (itemId, newPrice) => {
+    try {
+      await updateDoc(doc(db, 'menuItems', itemId), {
+        price: newPrice
+      })
+    } catch (error) {
+      console.error('Error updating price:', error)
+    }
   }
 
   return (
-    <MenuContext.Provider value={{ menuItems, addMenuItem, deleteMenuItem, updateStock, decrementStock, updatePrice }}>
+    <MenuContext.Provider value={{ menuItems, addMenuItem, deleteMenuItem, updateStock, decrementStock, updatePrice, loading }}>
       {children}
     </MenuContext.Provider>
   )
