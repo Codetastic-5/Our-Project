@@ -157,8 +157,8 @@ const AdminDashboard = ({ onLogout }) => {
       <Header isLoggedIn={true} onLogout={onLogout} role="admin" hideMenu={true} />
 
       <main className="flex-1 px-4 sm:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
-          <div className="lg:col-span-1 bg-white rounded-lg shadow-lg overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
+          <div className="lg:col-span-2 bg-white rounded-lg shadow-lg overflow-hidden">
             <div className="bg-orange-600 px-8 py-5">
               <h2 className="text-xl font-bold text-white tracking-wide">
                 TODAY'S MENU
@@ -209,7 +209,7 @@ const AdminDashboard = ({ onLogout }) => {
                 </div>
               </div>
 
-              <div className="space-y-0 max-h-96 overflow-y-auto">
+              <div className="space-y-0 max-h-[500px] overflow-y-auto">
                 {menuItems.map((item, index) => (
                   <div
                     key={item.id}
