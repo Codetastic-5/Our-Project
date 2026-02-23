@@ -230,9 +230,7 @@ const Header = ({
 
         <ul style={{ marginBottom: '25px', paddingLeft: '0', listStyleType: 'none', fontWeight: 'bold', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
           <li>• Bench Matthew C. Culubong</li>
-          <li>• Kenneth R. Pascua</li>
           <li>• Jhon Roy B. Gamboa</li>
-          <li>• Bryce Amber B. Udaundo</li>
           <li>• Alecks Rejina D. Santos</li>
         </ul>
 
