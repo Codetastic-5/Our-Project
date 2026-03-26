@@ -102,33 +102,53 @@ const AdminDashboard = ({ onLogout }) => {
     return filtered;
   }, [customers, searchUsername, minPoints, sortBy, sortOrder]);
 
-  const handleAddMenuItem = () => {
+  const handleAddMenuItem = async () => {
     if (!newItemName.trim()) {
       toast.error("Please enter an item name.");
       return;
     }
     const stock = parseInt(newItemStock) || 0;
     const price = parseInt(newItemPrice) || 0;
-    addMenuItem(newItemName.trim(), stock, price);
-    toast.success(`"${newItemName.trim()}" added to menu with ${stock} stocks at ₱${price}!`);
-    setNewItemName("");
-    setNewItemStock("");
-    setNewItemPrice("");
+    try {
+      await addMenuItem(newItemName.trim(), stock, price);
+      toast.success(`"${newItemName.trim()}" added to menu with ${stock} stocks at ₱${price}!`);
+      setNewItemName("");
+      setNewItemStock("");
+      setNewItemPrice("");
+    } catch (error) {
+      console.error('Error adding menu item:', error);
+      toast.error('Failed to add menu item. Please try again.');
+    }
   };
 
-  const handlePriceChange = (itemId, value) => {
+  const handlePriceChange = async (itemId, value) => {
     const price = parseInt(value) || 0;
-    updatePrice(itemId, price);
+    try {
+      await updatePrice(itemId, price);
+    } catch (error) {
+      console.error('Error updating price:', error);
+      toast.error('Failed to update price.');
+    }
   };
 
-  const handleStockChange = (itemId, value) => {
+  const handleStockChange = async (itemId, value) => {
     const stock = parseInt(value) || 0;
-    updateStock(itemId, stock);
+    try {
+      await updateStock(itemId, stock);
+    } catch (error) {
+      console.error('Error updating stock:', error);
+      toast.error('Failed to update stock.');
+    }
   };
 
-  const handleDeleteItem = (itemId, itemName) => {
-    deleteMenuItem(itemId);
-    toast.info(`"${itemName}" removed from menu.`);
+  const handleDeleteItem = async (itemId, itemName) => {
+    try {
+      await deleteMenuItem(itemId);
+      toast.info(`"${itemName}" removed from menu.`);
+    } catch (error) {
+      console.error('Error deleting menu item:', error);
+      toast.error('Failed to delete menu item.');
+    }
   };
 
   const handleDeleteCustomer = async (customerId, customerName) => {
